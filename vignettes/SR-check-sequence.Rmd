@@ -1,0 +1,100 @@
+Checking the CIDnetworks Suite: COV
+========================================================
+
+A.C. Thomas, November 22
+
+ `r library(CIDnetworks)`
+
+SR component
+-------------
+
+Test the base component first.
+
+```{r}
+n.nodes <- 100
+test.sr <- SR(n.nodes=100, intercept.sr.var=10, generate=TRUE)
+
+test.sr.pieces <- test.sr$pieces()
+test.sr.value <- test.sr$value()
+
+test.sr.gibbs <- test.sr$gibbs.full(draws=500, report=100, burnin=200, thin=2, make.random.start=TRUE)
+```
+
+```{r fig.width=12}
+test.sr.gibbs.unlist <- list.output.to.matrices (test.sr.gibbs)
+test.sr.gibbs.value <- test.sr$gibbs.value(test.sr.gibbs)
+plot(test.sr.gibbs.unlist$log.lik, main="Log-likelihood")
+plot(test.sr.gibbs.unlist$intercept.sr.var, main=paste("SR Variance", test.sr.pieces$intercept.sr.var)); abline(h=test.sr.pieces$intercept.sr.var, lwd=3, col=2)
+netplot(test.sr$edge.list, test.sr.value, colvalues=20, main="Oracle values")
+netplot(test.sr$edge.list, apply(test.sr.gibbs.value, 1, mean), colvalues=20, main="Fitted values")
+plot(test.sr.value, apply(test.sr.gibbs.value, 1, mean))
+```
+
+Now, Gaussian within CID:
+
+```{r}
+test.sr.g <- CID.generate (n.nodes, 
+                           components=list(SR(4)), 
+                           intercept=1, residual.variance=2, generate=TRUE)
+test.sr.g.pieces <- test.sr.g$pieces()
+test.sr.g.value <- test.sr.g$value()
+
+test.sr.g.gibbs <- test.sr.g$gibbs.full(draws=300, report=100, burnin=300, make.random.start=TRUE)
+```
+
+```{r fig.width=12}
+test.sr.g.gibbs.unwind <- list.output.to.matrices (test.sr.g.gibbs)
+test.sr.g.gibbs.value <- test.sr.g$gibbs.value(test.sr.g.gibbs)
+
+plot(test.sr.g.gibbs.unwind$log.lik, main="Log-likelihood")
+plot(test.sr.g.gibbs.unwind$SRout.intercept.sr.var, main=paste("SR Variance", test.sr.g.pieces[[3]]$intercept.sr.var)); abline(h=test.sr.g.pieces[[3]]$intercept.sr.var, lwd=3, col=2)
+
+color.range <- range(c(test.sr.g.value, apply(test.sr.g.gibbs.value, 1, mean)))
+netplot(test.sr.g$edge.list, test.sr.g.value, colvalues=20, main="Oracle values", extremes=color.range)
+netplot(test.sr.g$edge.list, apply(test.sr.g.gibbs.value, 1, mean), colvalues=20, main="Fitted values", extremes=color.range)
+
+plot(test.sr.g.value, apply(test.sr.g.gibbs.value, 1, mean))
+```
+
+Binary within CID:
+```{r}
+test.sr.b <- CID.generate (n.nodes, 
+                           components=list(SR(4)), 
+                           intercept=-1.5, residual.variance=2, generate=TRUE, class.outcome="binary")
+test.sr.b.pieces <- test.sr.b$pieces()
+test.sr.b.value <- test.sr.b$value()
+```
+
+First: does the network look good enough to test out?
+```{r fig.width=8}
+netplot(test.sr.b$edge.list, test.sr.b$outcome, colvalues=2, main="Oracle values", extremes=c(0,1))
+```
+
+Under this simulation, this looks sufficient. Run the Gibbs!
+
+```{r}
+test.sr.b.gibbs <- test.sr.b$gibbs.full(draws=1000, report=100, burnin=0, make.random.start=TRUE)
+```
+
+```{r fig.width=12}
+test.sr.b.gibbs.unwind <- list.output.to.matrices (test.sr.b.gibbs)
+test.sr.b.gibbs.value <- test.sr.g$gibbs.value(test.sr.b.gibbs)
+
+test.sr.b.gibbs.unwind <- cut.burnin(test.sr.b.gibbs.unwind, 200)
+
+plot(c(test.sr.b.gibbs.unwind$log.lik), main="Log-likelihood")
+plot(c(test.sr.b.gibbs.unwind$SRout.intercept.sr.var), main=paste("SR Variance", test.sr.b.pieces[[3]]$intercept.sr.var)); abline(h=test.sr.b.pieces[[3]]$intercept.sr.var, lwd=3, col=2)
+plot(c(test.sr.b.gibbs.unwind$intercept), main=paste("Intercept", test.sr.b.pieces$intercept)); abline(h=test.sr.b.pieces$intercept, lwd=3, col=2)
+
+color.range <- range(c(test.sr.b.value, apply(test.sr.b.gibbs.value, 1, mean)))
+netplot(test.sr.b$edge.list, test.sr.b.value, colvalues=20, main="Oracle values", extremes=color.range)
+netplot(test.sr.b$edge.list, apply(test.sr.b.gibbs.value, 1, mean), colvalues=20, main="Fitted values", extremes=color.range)
+
+plot(test.sr.b.value, apply(test.sr.b.gibbs.value, 1, mean))
+plot(test.sr.b.pieces[[3]]$intercept.sr, apply(test.sr.b.gibbs.unwind$SRout.intercept.sr, 1, mean))
+
+#netplot(test.sr.b$edge.list, 1*(test.sr.b.value>0), colvalues=20, main="Oracle values")
+#netplot(test.sr.b$edge.list, 1*(1*(apply(test.sr.b.gibbs.value, 1, mean)>0) == 1*(test.sr.b.value>0)), colvalues=20, main="Fitted values")
+
+```
+

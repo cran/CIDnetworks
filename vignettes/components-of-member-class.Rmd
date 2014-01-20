@@ -1,0 +1,158 @@
+Components of a CIDnetworks member subclass
+========================================================
+
+Each member class of a CID object has a set of distinct components, both in data objects (fields) and methods that act on those objects.
+
+We demonstrate on a basic Latent Space Model with 5 nodes and a synthetic outcome:
+
+```{r}
+library(CIDnetworks)
+test.lsm <- LSM(n.nodes=5, generate=TRUE)
+```
+
+Universal Fields 
+----------------
+
+Every subclass has four basic fields, common to the networks that carry them.
+
+`n.nodes` is the number of nodes in the network.
+
+```{r}
+test.lsm$n.nodes
+```
+
+`edge.list` is the `k`-by-`2` matrix of all edges in the network.
+
+```{r}
+test.lsm$edge.list
+```
+
+`outcome` is a `k`-length vector of Gaussian outcome measures (treated as residuals by the subclass and transferred from the master class.) These outcomes were generated automatically by the constructor:
+
+```{r}
+test.lsm$outcome
+```
+
+`residual.variance` is the assumed variance of the model with respect to the outcome and is used primarily in the MCMC.
+
+```{r}
+test.lsm$residual.variance
+```
+
+
+Subclass-specific Fields
+------------------------
+
+Each subclass has a unique set of objects that determine the effective network geometry: fixed covariates, coefficients, and prior specifications. The LSM has several:
+
+`dimension`, or the Euclidean dimension of the underlying latent space,
+```{r}
+test.lsm$dimension
+```
+
+`latent.space.pos`, the actual positions in the latent space, which is a `n.nodes`-by-`dimension` matrix,
+
+```{r}
+test.lsm$latent.space.pos
+```
+
+whose values are centered about the origin and have fixed variance.
+
+This is multiplied by `mult.factor`, which allows the space to be unbounded, and has prior parameters
+
+```{r}
+test.lsm$mult.factor
+test.lsm$mult.factor.m
+test.lsm$mult.factor.v
+```
+
+Finally, since the latent space positions have no direct draw under Gibbs sampling, we can also specify a step size for each Metropolis proposal.
+
+```{r}
+test.lsm$latent.space.tune
+```
+
+General Methods
+---------------
+
+All subclasses have the same specification of methods, so that each call can be made independent of which subclass is being queried. 
+
+`initialize()` is called by default when a class is constructed, as we did before, as does not need to be called directly. In this setting, `LSM(n.nodes=5)` is a shortcut to the full method 
+
+```
+LSMcid$new(n.nodes=5)
+```
+
+`pieces()` returns a list of all parameter elements in the subclass. For the Latent Space Model, this returns `latent.space.pos` and `mult.factor`:
+
+```{r}
+test.lsm$pieces()
+```
+
+`value()` returns the mean value of each edge as calculated by the model parameters.
+
+```{r}
+cbind(test.lsm$edge.list, test.lsm$value())
+```
+
+`show()` is the equivalent of `print()`, and displays the model parameters in a more presentable fashion:
+
+```{r}
+test.lsm$show()
+```
+
+`generate()` produces a draw from the model, given the parameters and the residual variance, and saves it to `outcome`.
+
+```{r}
+test.lsm$residual.variance <- 0.01
+test.lsm$generate()
+cbind(test.lsm$value(), test.lsm$outcome)
+```
+
+`log.likelihood()` returns the total log likelihood over all specified edges given the model parameters, the residual outcome and residual variance.
+
+```{r}
+test.lsm$log.likelihood()
+```
+
+
+Gibbs Sampling
+--------------
+
+`random.start` resets the model parameters to random values in anticipation of a Markov Chain Monte Carlo run.
+
+```{r}
+test.lsm$pieces()
+test.lsm$random.start()
+test.lsm$pieces()
+```
+
+`draw()` completes one cycle of a Gibbs sampler, drawing each parameter in sequence conditional on the rest. For the LSM, this is a Metropolis proposal on each node's `latent.space.pos` and a direct draw on `mult.factor`.
+
+```{r}
+test.lsm$pieces()
+test.lsm$draw()
+test.lsm$pieces()
+```
+
+`gibbs.full()` runs `draw()` a large number of times and returns a list of the outcomes at prespecified positions, dependent on burn-in and thinning parameters.
+
+```{r}
+gibbs.run <- test.lsm$gibbs.full(draws=10, burnin=10, thin=10)
+```
+
+`gibbs.value` takes in the output of `gibbs.full` and calculates the value of the tie for each iteration.
+
+```{r}
+gibbs.value.out <- test.lsm$gibbs.value(gibbs.run)
+```
+
+
+Invisible pieces
+----------------
+`sr.rows` holds the locations of each node in the `edge.list`, which is used to speed up computations.
+
+`reinitialize()` is called when the original model initialization does not match the parameters added, namely the node count and edge list. This is called by `CIDnetwork.generate()` by default and is never needed by the user.
+
+`value.ext()` returns the mean value for each edge in a subset, for a specified list of model parameters. This is used when assessing the log-probability density of the data in the post-processing of MCMC and need not be directly accessed.
+

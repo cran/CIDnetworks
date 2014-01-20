@@ -1,0 +1,61 @@
+CIDnetworks Example: C. elegans neural network
+========================================================
+
+Let's load in the edges for the C. elegans neural network and plot it.
+
+```{r}
+edges <- read.table("../c-elegans/celegans_n306.txt")
+library(network)
+plot(network(edges[,1:2]), displayis=FALSE)
+title(main="C. elegans neural network")
+```
+
+This was a directed edge list with strengths. Let's do the undirected binary version for this demo. First, we set up the object with the edge list and outcome.
+
+```{r}
+library(CIDnetworks)
+c.elegans <- CIDnetwork$new(n.nodes=306, generate=TRUE, components=list(), class="binary")
+c.elegans$outcome <- 0*c.elegans$outcome
+edges.bin <- t(apply(edges[,1:2], 1, sort))
+for (ii in 1:dim(edges.bin)[1]) c.elegans$outcome[which(edges.bin[ii,1] == c.elegans$edge.list[,1] &
+                                                     edges.bin[ii,2] == c.elegans$edge.list[,2])] <- 1
+save (c.elegans, file="c.elegans.CIDnetwork.RData")
+```
+
+What's the baseline fit like?
+
+```{r}
+normal.model <- c.elegans$gibbs.full(report=100, burnin=100, draws=100, thin=5)
+normal.unzipped <- unwrap.CID.Gibbs (normal.model)
+plot(normal.unzipped$log.likelihood)
+c.elegans$DIC(normal.model)
+```
+
+Now let's try some more elaborate models. 2-dimensional latent space:
+
+```{r}
+lsm2 <- CID.Gibbs.B (c.elegans$edge.list, c.elegans$outcome, components=list(LSM(2)), burnin=3000, report=5, draws=200, thin=2)
+lsm2.z <- unwrap.CID.Gibbs (lsm2$results)
+plot(lsm2.z$log.likelihood)
+lsm2$CID.object$DIC(lsm2$results)
+```
+
+2-dimensional latent vector model:
+
+```{r}
+lvm2 <- CID.Gibbs.B (c.elegans$edge.list, c.elegans$outcome, components=list(LVM(2)), burnin=300, report=5, draws=200, thin=2)
+lvm2.z <- unwrap.CID.Gibbs (lvm2$results)
+plot(lvm2.z$log.likelihood)
+lvm2$CID.object$DIC(lvm2$results)
+```
+
+
+3-component Stochastic Block Model:
+
+```{r}
+sbm3 <- CID.Gibbs.B (c.elegans$edge.list, c.elegans$outcome, components=list(SBM(3)), burnin=300, report=5, draws=200, thin=2)
+sbm2.z <- unwrap.CID.Gibbs (sbm2$results)
+plot(lsm2.z$log.likelihood)
+sbm2$CID.object$DIC(sbm2$results)
+```
+

@@ -1,0 +1,14 @@
+useDynLib(CIDnetworks)
+importFrom(Rcpp, evalCpp)   
+importFrom(msm, rtnorm)
+importFrom(mvtnorm, rmvnorm)
+importFrom("methods", show)
+#exportMethods()
+
+#exportPattern("^[[:alpha:]]+")
+export (CID, CID.Gibbs, CID.generate, CIDnetwork,   COV,HBM,LSM,LVM,MMSBM,SBM,SR,  unwrap.CID.Gibbs,
+        network.plot)
+
+S3method (plot, CID.Gibbs)
+S3method (print, CID.Gibbs)
+S3method (summary, CID.Gibbs)

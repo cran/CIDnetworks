@@ -1,0 +1,66 @@
+CIDnetworks -- Demos and Checks
+========================================================
+
+These are the demos for CIDnetworks (Conditionally Independent Dyad models) version 1.0, in which we have a series of stochastic network models for Gaussian or binary ties. In this version we have only a single network to consider.
+
+First: does it load once installed?
+
+```{r}
+library(CIDnetworks)
+```
+
+Case 1: Simulating and Fitting Simple Networks with Individual Reference Classes
+============================================
+
+There are several modes of network motif that can be used in the CIDnetworks framework. Each of these has its own mode for testing its functions separately from the main CID object, and declares an outcome that is normally distributed.
+
+
+COV (Direct tie covariates)
+-----------------------------
+
+First up is COV, or an object for covariates specified on each edge.
+
+```{r}
+covariate.network <- COV()
+class(covariate.network)
+COVcid
+```
+
+We see that an object of class `COVcid` has been created; this has a default edge list of 10 nodes:
+
+```{r}
+covariate.network$edge.list
+```
+
+and a default covariate matrix and coefficient vector
+
+```{r}
+covariate.network$covariates
+covariate.network$coef.cov
+```
+
+but no outcome:
+
+```{r}
+covariate.network$outcome
+```
+
+We can generate an outcome directly with this object:
+
+```{r}
+covariate.network$generate()
+covariate.network$outcome
+```
+
+which has mean 0, just as was specified for the single coefficient value. We can also specify the prior distribution for each covariate. Here is a network object with an intercept and single slope, with a joint probability distribution on the coefficients, and asking the object to generate an outcome with (default) variance 1:
+
+```{r}
+n.nodes <- 20
+random.predictor <- rbinom(n.nodes*(n.nodes-1)/2, 1, 1/2)
+cov.network.2 <- COV(n.nodes=n.nodes, covariates=matrix(cbind(1, random.predictor)),
+                     coef.cov=c(1,2), coef.cov.m=c(0,0), coef.cov.V=diag(1000000,2),
+                     generate=TRUE)
+cov.network.2
+cov.network.2$outcome
+```
+

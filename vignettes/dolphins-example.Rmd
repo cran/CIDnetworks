@@ -1,0 +1,87 @@
+CIDnetworks Example: dolphin social network
+========================================================
+
+Let's load in the edges for the dolphin social network and plot it.
+
+```{r}
+edges <- read.table("../dolphins/dolphins-62.txt")
+library(network)
+plot(network(edges[,1:2]), displayis=FALSE)
+title(main="Dolphin Social Network")
+```
+
+This was a directed edge list. Let's do the undirected binary version for this demo. First, we set up the object with the edge list and outcome.
+
+```{r}
+library(CIDnetworks)
+dolphin <- CID(n.nodes=62, generate=TRUE, components=list(), class="binary")
+dolphin$outcome <- 0*dolphin$outcome
+edges.bin <- t(apply(edges[,1:2], 1, sort))
+for (ii in 1:dim(edges.bin)[1]) dolphin$outcome[which(edges.bin[ii,1] == dolphin$edge.list[,1] &
+                                                     edges.bin[ii,2] == dolphin$edge.list[,2])] <- 1
+save (dolphin, file="dolphin.CIDnetwork.RData")
+```
+
+What's the baseline fit like?
+
+```{r}
+empty.model <- CID.Gibbs (dolphin$edge.list, dolphin$outcome, report=100, burnin=200, draws=200, thin=5)
+plot(empty.model$results$log.likelihood)
+c(empty.model$DIC, empty.model$marg.ll, empty.model$pseudo.CV.ll)
+```
+
+Now let's try some more elaborate models. 2-dimensional latent space:
+
+```{r}
+lsm2 <- CID.Gibbs (dolphin$edge.list, dolphin$outcome, components=list(LSM(2, tune=0.3)), burnin=1200, report=50, draws=200, thin=5)
+plot(lsm2$results$log.likelihood)
+c(lsm2$DIC, lsm2$marg.ll, lsm2$pseudo.CV.ll)
+```
+
+2-dimensional latent vector model:
+
+```{r}
+lvm2 <- CID.Gibbs (dolphin$edge.list, dolphin$outcome, components=list(LVM(2)), burnin=1200, report=50, draws=200, thin=5)
+plot(lvm2$results$log.likelihood)
+c(lvm2$DIC, lvm2$marg.ll, lvm2$pseudo.CV.ll)
+```
+
+
+3-component Stochastic Block Model:
+
+```{r}
+sbm3 <- CID.Gibbs (dolphin$edge.list, dolphin$outcome, components=list(SBM(3)), burnin=1200, report=50, draws=200, thin=5)
+plot(sbm3$results$log.likelihood)
+c(sbm3$DIC, sbm3$marg.ll, sbm3$pseudo.CV.ll)
+```
+
+
+Put them together: LSM plus SBM.
+
+```{r}
+sbm3.lsm2 <- CID.Gibbs (dolphin$edge.list, dolphin$outcome, components=list(SBM(3), LSM(2, tune=0.3)), burnin=1600, report=50, draws=200, thin=5)
+plot(sbm3.lsm2$results$log.likelihood)
+c(sbm3.lsm2$DIC, sbm3.lsm2$marg.ll, sbm3.lsm2$pseudo.CV.ll)
+```
+
+Overkill?
+
+```{r}
+sbm3.lsm2.lvm2 <- CID.Gibbs.B (dolphin$edge.list, dolphin$outcome, components=list(SBM(3), LSM(2, tune=0.3), LVM(2)), burnin=2000, report=50, draws=200, thin=5)
+plot(sbm3.lsm2.lvm2$results$log.likelihood)
+c(sbm3.lsm2.lvm2$DIC, sbm3.lsm2.lvm2$marg.ll, sbm3.lsm2.lvm2$pseudo.CV.ll)
+```
+
+What were they all again? For science!
+
+```{r}
+comp.table <- rbind(c(empty.model$DIC, empty.model$marg.ll, empty.model$pseudo.CV.ll),
+      c(lsm2$DIC, lsm2$marg.ll, lsm2$pseudo.CV.ll),
+      c(lvm2$DIC, lvm2$marg.ll, lvm2$pseudo.CV.ll),
+      c(sbm3$DIC, sbm3$marg.ll, sbm3$pseudo.CV.ll),
+      c(sbm3.lsm2$DIC, sbm3.lsm2$marg.ll, sbm3.lsm2$pseudo.CV.ll),
+      c(sbm3.lsm2.lvm2$DIC, sbm3.lsm2.lvm2$marg.ll, sbm3.lsm2.lvm2$pseudo.CV.ll))
+comp.table
+```
+
+Even accounting for the extra model variability, we're doing better fitting two models together for the dolphins than either one. 

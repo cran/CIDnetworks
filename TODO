@@ -1,0 +1,24 @@
+Things to add:
+
+-names
+
+-Permutation of networks for better display (block models, etc.)
+
+-C++ speedups for each mode.
+
+-auto-chain dynamics. How do you get 100 uncorrelated draws? How long would you have to wait until it was done?
+
+-full demos for each of the other data sets.
+
+-more data sets!
+
+-integration of simple network plots (stick-and-ball style).
+
+
+
+
+Bigger projects:
+
+1) Directed graphs.
+
+2) Multiple network indicators/tests.
