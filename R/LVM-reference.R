@@ -23,6 +23,7 @@ LVMcid <-
       
                      #inherited from main. Must fix later, but OK for now.
 
+      node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
@@ -60,6 +61,7 @@ LVMcid <-
         .self$edge.list <<- edge.list
         .self$sr.rows <<- sr.rows
         .self$residual.variance <<- residual.variance
+        .self$node.names <<- as.character(1:.self$n.nodes)
                 
         .self$dimension <<- dimension
         .self$latent.vector.pos <<- latent.vector.pos
@@ -85,7 +87,7 @@ LVMcid <-
       #},
       
       reinitialize = function (n.nodes=NULL,
-        edge.list=NULL) {
+        edge.list=NULL, node.names=NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes  #.self$
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
@@ -96,6 +98,9 @@ LVMcid <-
           latent.vector.pos <<- matrix(rnorm(dimension*n.nodes), nrow=n.nodes)
           #adjust.lsp()
         }
+        if (!is.null(node.names)) {
+          if (length(node.names) == .self$n.nodes) node.names <<- node.names
+        } else node.names <<- as.character(1:.self$n.nodes)
       },
       
       pieces = function (include.name=FALSE) {
@@ -109,10 +114,10 @@ LVMcid <-
 #       message("mult.factor:"); print(mult.factor)
       },
       plot = function (pos=latent.vector.pos, ...) {
-        latent.space.plot (pos, arrowlines=TRUE, ...)
+        latent.space.plot (pos, arrowlines=TRUE, labels=node.names, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, ...)
+        netplot (edge.list, color, node.labels=node.names, ...)
       },
       
       
@@ -161,6 +166,8 @@ LVMcid <-
   #Rotate back.
         latent.vector.pos.hold <-
           postprocess.latent.positions(latent.vector.pos.hold, recenter=FALSE)
+        rownames(latent.vector.pos.hold) <- node.names
+
         latent.vector.pos <<- latent.vector.pos.hold
  
       },
@@ -187,7 +194,9 @@ LVMcid <-
 
       gibbs.summary = function (gibbs.out) {
         lsp.all <- sapply(gibbs.out, function(gg) gg$latent.vector.pos)
-        return(matrix(apply(lsp.all, 1, mean), nrow=n.nodes))
+        output <- matrix(apply(lsp.all, 1, mean), nrow=n.nodes)
+        rownames(output) <- node.names
+        return(output)
       },
       
       gibbs.plot = function (gibbs.out, ...) {

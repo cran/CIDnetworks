@@ -9,7 +9,8 @@ SRcid <-
       intercept.sr.var="numeric",
       intercept.sr="numeric",
       intercept.sr.var.ab="numeric",
-      
+
+      node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
@@ -40,6 +41,7 @@ SRcid <-
         .self$edge.list <<- edge.list
         .self$sr.rows <<- sr.rows
         .self$residual.variance <<- residual.variance
+        .self$node.names <<- as.character(1:.self$n.nodes)
         
         .self$intercept.sr.var <<- intercept.sr.var
         .self$intercept.sr.var.ab <<- intercept.sr.var.ab
@@ -50,7 +52,7 @@ SRcid <-
       },
       
       reinitialize = function (n.nodes=NULL,
-        edge.list=NULL) {
+        edge.list=NULL, node.names=NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
@@ -60,6 +62,9 @@ SRcid <-
           message ("Reinitializing SR Intercepts")
           intercept.sr <<- rnorm(n.nodes, 0, sqrt(intercept.sr.var))
         }
+        if (!is.null(node.names)) {
+          if (length(node.names) == .self$n.nodes) node.names <<- node.names
+        } else node.names <<- as.character(1:.self$n.nodes)
       },
 
       pieces = function (include.name=FALSE) {
@@ -73,11 +78,11 @@ SRcid <-
         message("intercept.sr.var:"); print(intercept.sr.var)
         message("intercept.sr:"); print(intercept.sr)
       },
-      plot = function (coefs=intercept.sr, names=1:length(coefs), sd=NULL, interval=NULL, ...) {
+      plot = function (coefs=intercept.sr, names=node.names, sd=NULL, interval=NULL, ...) {
         dotchart.coef (coefs, names, sd, interval, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, ...)
+        netplot (edge.list, color, node.labels=node.names, ...)
       },
 
       
@@ -100,6 +105,7 @@ SRcid <-
       random.start = function () {
         intercept.sr.var <<- rgamma(1, 1) #1/rgamma(1, intercept.sr.var.ab[1], intercept.sr.var.ab[1])
         intercept.sr <<- rnorm (n.nodes, 0, sqrt(intercept.sr.var))
+        names(intercept.sr) <<- node.names
       },
       
       draw = function(verbose=0) {
@@ -111,6 +117,8 @@ SRcid <-
         meanblock <- varblock%*%(intercept.outcome/residual.variance + 0)   #mean zero.
         
         intercept.sr <<- c(rmvnorm(1, meanblock, varblock))
+        names(intercept.sr) <<- node.names
+        
         intercept.sr.var <<-
           1/rgamma(1,
                    intercept.sr.var.ab[1] + n.nodes/2,
@@ -142,7 +150,7 @@ SRcid <-
                      sd=apply(coef.cov.mat, 1, sd),
                      q2.5=apply(coef.cov.mat, 1, quantile, 0.025),
                      q97.5=apply(coef.cov.mat, 1, quantile, 0.975))
-        rownames(ob1) <- 1:n.nodes
+        rownames(ob1) <- node.names
         ob1
       },
       

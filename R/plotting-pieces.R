@@ -16,7 +16,7 @@ netplot <- function (edge.list, outcome,
                      n.nodes=max(c(edge.list)),
                      lwd=0.1,
                      symmetric=TRUE,
-                     node.labels=TRUE,
+                     node.labels=1:n.nodes,
                      label.cex=10/n.nodes,
                      ...) {
   #edge.list=make.edge.list(10); outcome=seq(0, 1, length=nrow(edge.list)); extremes=range(outcome); colvalues=2; col1="white"; col2="black"; colpalette=colorRampPalette(c(col1,col2)); n.nodes=max(c(edge.list)); symmetric=TRUE; null.color="#004400"
@@ -28,10 +28,8 @@ netplot <- function (edge.list, outcome,
   rect(edge.list[,1]-1, edge.list[,2]-1, edge.list[,1], edge.list[,2], col=colseq, lwd=lwd)
   if (symmetric) rect(edge.list[,2]-1, edge.list[,1]-1, edge.list[,2], edge.list[,1], col=colseq, lwd=lwd)
 
-  if (node.labels) {
-    text(1:n.nodes - 0.5, rep(-0.5, length(n.nodes)), 1:n.nodes, cex=label.cex)
-    text(rep(-0.5, length(n.nodes)), 1:n.nodes - 0.5, 1:n.nodes, cex=label.cex)
-  }
+  text(1:n.nodes - 0.5, rep(-0.5, length(n.nodes)), node.labels, cex=label.cex)
+  text(rep(0, length(n.nodes)), 1:n.nodes - 0.5, node.labels, cex=label.cex, pos=2)
   
 }
 
@@ -85,7 +83,10 @@ color.block.one <- function(color.matrix) {
   rgb(red, green, blue)
 }
 
-block.membership.plot <- function (membership.share, block.matrix, main="Stochastic Block Model Outcome", ...) {
+block.membership.plot <- function (membership.share, block.matrix,
+                                   main="Stochastic Block Model Outcome",
+                                   node.labels=1:dim(membership.share)[2], ...) {
+  
   #membership.share=matrix(runif(20*2), nrow=2); block.matrix=matrix(2*runif(2*2)-1, nrow=2); main="Stochastic Block Model Outcome"
 
   #what's the minimum number
@@ -113,7 +114,7 @@ block.membership.plot <- function (membership.share, block.matrix, main="Stochas
 
   text.x <- (1:n.nodes - 1) %% width + 0.5
   text.y <- floor((1:n.nodes - 1)/width)*(n.groups+2) - 0.5
-  text(text.x, -text.y, 1:n.nodes)
+  text(text.x, -text.y, node.labels)
 
   #plot the block matrix.
   x.points <- max(new.x) + (-n.groups+1):0
@@ -250,6 +251,7 @@ dendrogram.internals <- function (leaf.parents, internal.parents) { #, block.val
 circular.dendrogram <- function (leaf.parents,
                                  internal.parents,
                                  block.values=rep(0, length(internal.parents)),
+                                 node.labels=1:length(leaf.parents),
                                  ...) {
   #internal.parents=c(0,1,1,2,2,1,4,4,1); leaf.parents=sample(9, 100, replace=TRUE); block.values=rep(0, length(internal.parents))
   n.nodes <- length(leaf.parents)
@@ -275,7 +277,7 @@ circular.dendrogram <- function (leaf.parents,
   }
   
   #Go Leaves Go!
-  text (xy.leaves[,1], xy.leaves[,2], 1:n.nodes, cex=sqrt(50)/sqrt(n.nodes))
+  text (xy.leaves[,1], xy.leaves[,2], node.labels, cex=sqrt(50)/sqrt(n.nodes))
 
   #arcs.
   for (kk in 1:n.groups) if (sum(leaf.parents==kk) > 0) {

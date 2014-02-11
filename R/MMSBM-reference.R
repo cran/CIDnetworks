@@ -32,6 +32,7 @@ MMSBMcid <-
       #single.membership="logical",
       
       #inherited from main. Must fix later, but OK for now.
+      node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
@@ -70,6 +71,7 @@ MMSBMcid <-
         .self$n.nodes <<- n.nodes
         .self$edge.list <<- edge.list
         .self$sr.rows <<- sr.rows
+        .self$node.names <<- as.character(1:.self$n.nodes)
         
         .self$n.groups <<- n.groups
         
@@ -97,7 +99,7 @@ MMSBMcid <-
       },
        
       reinitialize = function (n.nodes=NULL,
-        edge.list=NULL) {
+        edge.list=NULL, node.names=NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
@@ -112,6 +114,9 @@ MMSBMcid <-
           membership.edge <<- draw.MMSB.from.nodes(edge.list, membership.node)
         }
         rotate()
+        if (!is.null(node.names)) {
+          if (length(node.names) == .self$n.nodes) node.names <<- node.names
+        } else node.names <<- as.character(1:.self$n.nodes)
 
       },
 
@@ -131,10 +136,10 @@ MMSBMcid <-
         #message("mult.factor:"); print(mult.factor)
       },
       plot = function (memb=membership.node, block=symBlock(b.vector), ...) {
-        block.membership.plot (memb, block, ...)
+        block.membership.plot (memb, block, node.labels=node.names, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, ...)
+        netplot (edge.list, color, node.labels=node.names, ...)
       },
       
 
@@ -283,8 +288,10 @@ MMSBMcid <-
 
       gibbs.summary = function (gibbs.out) {
         membs <- matrix(apply(sapply(gibbs.out, function(gg) gg$membership.node), 1, mean), ncol=n.nodes)
+        colnames(membs) <- node.names
+        
         bvec <- apply(sapply(gibbs.out, function(gg) gg$b.vector), 1, mean)
-        return(list(membership.node=membs, b.vector=bvec))
+        return(list(membership.node=membs, b.vector=bvec, block=symBlock(bvec)))
       },
       
       gibbs.plot = function (gibbs.out, ...) {

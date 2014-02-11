@@ -2,16 +2,16 @@ Package: CIDnetworks
 Type: Package
 Title: Generative models for networks with conditionally independent
         dyadic structure
-Version: 0.2
-Date: 2014-01-20
+Version: 0.2.2
+Date: 2014-02-11
 Author: Beau Dabbs, Brian Junker, Mauricio Sadinle, Tracy Sweet, A.C. Thomas 
 Maintainer: A.C. Thomas <act@acthomas.ca>
 Description: Generative models for networks with conditionally independent dyadic structure
 License: GPL (> 3)
 Imports: mvtnorm, msm, methods, Rcpp
 LinkingTo: Rcpp
-Packaged: 2014-02-10 18:44:48 UTC; acthomas
+Packaged: 2014-02-11 18:23:07 UTC; acthomas
 Depends: R (>= 2.10)
 NeedsCompilation: yes
 Repository: CRAN
-Date/Publication: 2014-02-10 21:05:56
+Date/Publication: 2014-02-12 00:37:00

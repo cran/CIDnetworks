@@ -28,6 +28,7 @@ SBMcid <-
       group.pairs="matrix",
       
       #inherited from main. Must fix later, but OK for now.
+      node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
@@ -68,6 +69,7 @@ SBMcid <-
         .self$n.nodes <<- n.nodes
         .self$edge.list <<- edge.list
         .self$sr.rows <<- sr.rows
+        .self$node.names <<- as.character(1:.self$n.nodes)
         
         .self$n.groups <<- n.groups
         
@@ -106,7 +108,7 @@ SBMcid <-
       },
        
       reinitialize = function (n.nodes=NULL,
-        edge.list=NULL) {
+        edge.list=NULL, node.names=NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
@@ -117,6 +119,10 @@ SBMcid <-
           membership <<- sample(n.groups, n.nodes, replace=TRUE)
           membership.a <<- matrix(1, nrow=n.nodes, ncol=n.groups)
         }
+        
+        if (!is.null(node.names)) {
+          if (length(node.names) == .self$n.nodes) node.names <<- node.names
+        } else node.names <<- as.character(1:.self$n.nodes)
         
       },
 
@@ -133,10 +139,10 @@ SBMcid <-
         #message("mult.factor:"); print(mult.factor)
       },
       plot = function (memb=membership, block=symBlock(b.vector), ...) {
-        single.membership.plot (memb, block, ...)
+        single.membership.plot (memb, block, node.labels=node.names, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, ...)
+        netplot (edge.list, color, node.labels=node.names, ...)
       },
 
 
@@ -268,14 +274,15 @@ SBMcid <-
           d1 <- sapply(gibbs.out, function(gg) number.to.vector(gg$membership))
           matrix(apply(d1, 1, mean),  ncol=n.nodes)
         }
+        colnames(membs1) <- node.names
         bvec <- apply(sapply(gibbs.out, function(gg) gg$b.vector), 1, mean)
-        return(list(membership=membs1, b.vector=bvec))
+        return(list(membership=membs1, b.vector=bvec, block=symBlock(bvec)))
 
       },
       
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
-        block.membership.plot (get.sum[[1]], symBlock(get.sum[[2]]), main = "SBM Summary from Gibbs Sampler", ...)
+        block.membership.plot (get.sum[[1]], symBlock(get.sum[[2]]), node.labels=node.names, main = "SBM Summary from Gibbs Sampler", ...)
       }
 
 

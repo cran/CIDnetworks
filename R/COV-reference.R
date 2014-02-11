@@ -17,6 +17,7 @@ COVcid <-
       
       cov.block="matrix",
       
+      node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
@@ -49,6 +50,7 @@ COVcid <-
         .self$edge.list <<- edge.list
         .self$sr.rows <<- sr.rows
         .self$residual.variance <<- residual.variance
+        .self$node.names <<- as.character(1:.self$n.nodes)
         
         .self$covariates <<- cbind(covariates)
         .self$coef.cov <<- coef.cov
@@ -71,7 +73,7 @@ COVcid <-
         
       },
       
-      reinitialize = function (n.nodes=NULL, edge.list=NULL) {
+      reinitialize = function (n.nodes=NULL, edge.list=NULL, node.names=NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
@@ -85,6 +87,9 @@ COVcid <-
           covariates <<- covariates.temp
         }
         if (nrow(covariates) > nrow(edge.list)) covariates <<- covariates[1:nrow(edge.list),]
+        if (!is.null(node.names)) {
+          if (length(node.names) == .self$n.nodes) node.names <<- node.names
+        } else node.names <<- as.character(1:.self$n.nodes)
       },
 
       pieces = function (include.name=FALSE) {
@@ -101,7 +106,7 @@ COVcid <-
         dotchart.coef (coefs, names, sd, interval, main=main, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, ...)
+        netplot (edge.list, color, node.labels=node.names, ...)
       },
       
       

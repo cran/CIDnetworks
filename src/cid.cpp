@@ -25,15 +25,15 @@ IntegerMatrix makeEdgeListSelfies (int nn) {
 
 // [[Rcpp::export]]
 NumericMatrix symBlock (NumericVector entries) {
-	int dd = (sqrt(1+8*entries.size())-1)/2;
-	NumericMatrix output (dd,dd);
-	IntegerMatrix els = makeEdgeListSelfies (dd);
-	int ii;
-	for (ii=0; ii<els.rows(); ++ii) {
-		output(els(ii,0)-1, els(ii,1)-1) = entries[ii];
-		output(els(ii,1)-1, els(ii,0)-1) = entries[ii];
-	}
-	return(output);
+  int dd = (int)((sqrt(1+8*(double)(entries.size()))-1)/2);
+  NumericMatrix output (dd,dd);
+  IntegerMatrix els = makeEdgeListSelfies (dd);
+  int ii;
+  for (ii=0; ii<els.rows(); ++ii) {
+    output(els(ii,0)-1, els(ii,1)-1) = entries[ii];
+    output(els(ii,1)-1, els(ii,0)-1) = entries[ii];
+  }
+  return(output);
 }
 
 // [[Rcpp::export]]

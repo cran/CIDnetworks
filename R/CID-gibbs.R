@@ -137,7 +137,7 @@ CIDnetwork <-
         #reinitialize components, just in case.
         if (length(components)>0) {
           if (class(components) != "list") components.t <- list(components) else components.t <- components
-          for (kk in 1:length(components.t)) components.t[[kk]]$reinitialize (n.nodes, edge.list)
+          for (kk in 1:length(components.t)) components.t[[kk]]$reinitialize (n.nodes, edge.list, .self$node.names)
           .self$components <<- components.t
         } else .self$components <- list()
         
@@ -163,15 +163,19 @@ CIDnetwork <-
          
       },
       
-      reinitialize = function (n.nodes=NULL,
-        edge.list=NULL) {
+      reinitialize = function (n.nodes=NULL, edge.list=NULL, node.names=NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
           sr.rows <<- row.list.maker(edge.list)
         }
         
-        if (length(components)>0) for (kk in 1:length(components)) components[[kk]]$reinitialize (n.nodes, edge.list)
+        if (length(components)>0) for (kk in 1:length(components)) components[[kk]]$reinitialize (n.nodes, edge.list, node.names)
+
+        if (!is.null(node.names)) {
+          if (length(node.names) == .self$n.nodes) node.names <<- node.names
+        } else node.names <<- as.character(1:.self$n.nodes)
+        
       },
 
       pieces = function (include.name=FALSE) {
@@ -209,7 +213,7 @@ CIDnetwork <-
         if (length(components) > 0) for (cc in 1:length(components)) components[[cc]]$plot()
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, ...)
+        netplot (edge.list, color, node.labels=node.names, ...)
       },
 
       value = function (redo=FALSE) {
@@ -497,11 +501,20 @@ CID.Gibbs <- function (edge.list,
     if (missing(sociomatrix)) {
       if (missing(edge.list)) stop ("Neither an edge list not sociomatrix was provided.")
 
-      edge.list <- as.matrix(edge.list)
+      edge.list <- cbind(as.character(edge.list[,1]), as.character(edge.list[,2]))
+      if (any(edge.list[,1] == edge.list[,2])) {
+        message ("Removing self edges.")
+        nonselfies <- which(edge.list[,1] != edge.list[,2])
+        edge.list <- edge.list[nonselfies,]
+        if (!missing(outcome)) outcome <- outcome[nonselfies]
+      }
       
-      node.names <- unique(c(edge.list))
+      #node.names <- unique(c(as.character(edge.list[,1]), as.character(edge.list[,2])))
+      node.names <- unique(c(edge.list[,1], edge.list[,2]))
+      
       n.nodes <- length(node.names)
-      numbered.edge.list <- matrix (match(c(edge.list), node.names), ncol=2)
+      numbered.edge.list <- cbind (match(edge.list[,1], node.names),
+                                   match(edge.list[,2], node.names))
         
       if (missing(outcome) | fill.in.missing.edges) {
         if (missing(outcome)) message("Assuming that this is a complete network with specified edges as binary ties.") else message("Filling in unspecified edges as zeroes.")
@@ -513,12 +526,13 @@ CID.Gibbs <- function (edge.list,
                                                    (numbered.edge.list[rr,2] == new.edge.list[,1] &
                                                     numbered.edge.list[rr,1] == new.edge.list[,2]))))
 
+        rowmatch <- rowmatch[is.finite(rowmatch)]
           
         temp.outcome <- rep(0, nrow(new.edge.list))
         if (missing(outcome)) {
           temp.outcome[rowmatch] <- 1
         } else {
-          temp.outcome[rowmatch] <- outcome
+          temp.outcome[rowmatch] <- outcome[is.finite(rowmatch)]
         }
         
         outcome <- temp.outcome
