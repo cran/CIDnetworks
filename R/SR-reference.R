@@ -153,11 +153,25 @@ SRcid <-
         rownames(ob1) <- node.names
         ob1
       },
+      print.gibbs.summary = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+        message ("Sender-Receiver Coefficients:")
+        print (get.sum)
+        return(invisible(get.sum))
+      },
+      
       
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
         plot (get.sum[,1], interval = get.sum[,3:4], main = "SR-Intercept Summary from Gibbs Sampler", ...)
+      },
+
+      gibbs.node.colors = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+        value <- (get.sum[,1]-min(get.sum[,1]))/(max(get.sum[,1])-min(get.sum[,1]))
+        rgb (rep(1, n.nodes), 1-value, 1-value)
       }
+      
       )
     )
 

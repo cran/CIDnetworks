@@ -63,7 +63,7 @@ MMSBMcid <-
         shift=0,
         #single.membership=FALSE,
         
-        restrict.and.shift=TRUE,
+        restrict.and.shift=FALSE,
         generate=FALSE
         
         ) {
@@ -105,6 +105,18 @@ MMSBMcid <-
           edge.list <<- edge.list
           sr.rows <<- row.list.maker(edge.list)
         }
+
+        if (n.groups > n.nodes) {
+          warning ("MMSBM: Resetting number of groups to one less than the number of nodes.")
+          n.groups <<- n.nodes - 1
+          b.vector <<- rep(0, n.groups*(n.groups+1)/2)
+          
+          membership.node <<- sample(n.groups, n.nodes, replace=TRUE)
+          membership.edge <<- draw.MMSB.from.nodes(edge.list, membership.node)
+          membership.alpha0 <<- membership.alpha0[1:n.groups]
+        }
+        
+        
         if (ncol(membership.node) != n.nodes) {
           message ("Reinitializing MMSBM Membership Fractions")
           membership.node <<- rdirichlet.block (matrix(membership.alpha0, nrow=n.groups, ncol=n.nodes))
@@ -291,12 +303,32 @@ MMSBMcid <-
         colnames(membs) <- node.names
         
         bvec <- apply(sapply(gibbs.out, function(gg) gg$b.vector), 1, mean)
-        return(list(membership.node=membs, b.vector=bvec, block=symBlock(bvec)))
+        return(list(membership.node=membs,
+                    b.vector=bvec,
+                    block=symBlock(bvec)))
       },
-      
+      print.gibbs.summary = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+        message ("Block membership mixes:")
+        print (get.sum$membership.node)
+
+        message ("Block value matrix:")
+        print (get.sum$block)
+        
+        return(invisible(get.sum))
+      },
+
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
-        plot (get.sum[[1]], symBlock(get.sum[[2]]), main = "MMSBM Summary from Gibbs Sampler", ...)
+        plot (get.sum$membership.node,
+              get.sum$block,
+              main = "MMSBM Summary from Gibbs Sampler", ...)
+      },
+
+      gibbs.node.colors = function (gibbs.out, colors=(1:n.groups) + 1) {
+        rep("#DDDDFF", n.nodes)
+        #get.sum <- gibbs.summary(gibbs.out)
+        #return(colors[get.sum$modal.membership])
       }
 
 

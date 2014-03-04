@@ -196,12 +196,23 @@ LVMcid <-
         lsp.all <- sapply(gibbs.out, function(gg) gg$latent.vector.pos)
         output <- matrix(apply(lsp.all, 1, mean), nrow=n.nodes)
         rownames(output) <- node.names
+        colnames(output) <- paste0("pos",1:ncol(output))
         return(output)
       },
-      
+      print.gibbs.summary = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+        message ("Mean Latent Vector Positions:")
+        print(get.sum)
+        return(invisible(get.sum))
+      },
+
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
         plot (get.sum, main = "Mean Latent Vector Positions from Gibbs Sampler", ...)
+      },
+
+      gibbs.node.colors = function (gibbs.out) {
+        rep("#DDDDFF", n.nodes)
       }
       
       )

@@ -1,6 +1,7 @@
 \name{CIDnetworks-gibbs}
 \alias{CID.Gibbs}
 \alias{network.plot}
+\alias{sociogram.plot}
 \alias{unwrap.CID.Gibbs}
 \alias{print.CID.Gibbs}
 \alias{plot.CID.Gibbs}
@@ -30,7 +31,8 @@
   \method{plot}{CID.Gibbs} (x, \dots)
 
   network.plot (x, fitted.values=FALSE, ...)
-  
+  sociogram.plot (x, component.color=0, ...)
+ 
   
 
 }
@@ -62,7 +64,9 @@
 
   \item{x, object}{An object outputted from CID.Gibbs.}
   \item{fitted.values}{If TRUE, plots the fitted tie strength under the
-  Gibbs sampler. If FALSE, plots the network outcomes as entered.}
+    Gibbs sampler. If FALSE, plots the network outcomes as entered.}
+  \item{component.color}{If non-zero, colors the nodes in the sociogram
+    according to the output of the Gibbs sampler.}
   
      
 }

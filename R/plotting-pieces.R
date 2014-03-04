@@ -5,7 +5,6 @@
 # Whole network plots.
 
 
-
 # image plot for a network.
 netplot <- function (edge.list, outcome,
                      extremes=range(outcome),
@@ -18,18 +17,24 @@ netplot <- function (edge.list, outcome,
                      symmetric=TRUE,
                      node.labels=1:n.nodes,
                      label.cex=10/n.nodes,
+
+                     node.order=1:n.nodes,
                      ...) {
   #edge.list=make.edge.list(10); outcome=seq(0, 1, length=nrow(edge.list)); extremes=range(outcome); colvalues=2; col1="white"; col2="black"; colpalette=colorRampPalette(c(col1,col2)); n.nodes=max(c(edge.list)); symmetric=TRUE; null.color="#004400"
   
   plot(c(-1, n.nodes), c(-1, n.nodes), ty="n", axes=FALSE, xlab="", ylab="", ...)
   rect(0, 0, n.nodes, n.nodes, col=null.color)
   colseq <- colpalette(colvalues)[as.numeric(cut(outcome, breaks=seq(min(extremes), max(extremes), length=colvalues+1), include.lowest=TRUE))]
-  
-  rect(edge.list[,1]-1, edge.list[,2]-1, edge.list[,1], edge.list[,2], col=colseq, lwd=lwd)
-  if (symmetric) rect(edge.list[,2]-1, edge.list[,1]-1, edge.list[,2], edge.list[,1], col=colseq, lwd=lwd)
 
-  text(1:n.nodes - 0.5, rep(-0.5, length(n.nodes)), node.labels, cex=label.cex)
-  text(rep(0, length(n.nodes)), 1:n.nodes - 0.5, node.labels, cex=label.cex, pos=2)
+  reordered.edge.list <- array(node.order[edge.list], dim(edge.list))
+  
+  rect(reordered.edge.list[,1]-1, reordered.edge.list[,2]-1,
+       reordered.edge.list[,1], reordered.edge.list[,2], col=colseq, lwd=lwd)
+  if (symmetric) rect(reordered.edge.list[,2]-1, reordered.edge.list[,1]-1,
+                      reordered.edge.list[,2], reordered.edge.list[,1], col=colseq, lwd=lwd)
+
+  text(1:n.nodes - 0.5, rep(-0.5, length(n.nodes)), node.labels[node.order], cex=label.cex)
+  text(rep(0, length(n.nodes)), 1:n.nodes - 0.5, node.labels[node.order], cex=label.cex, pos=2)
   
 }
 
@@ -76,6 +81,8 @@ number.to.vector <- function(number.membership.vector, n.groups=max(number.membe
 
 color.block.one <- function(color.matrix) {
   #color.matrix = -4:4
+  #print(color.matrix)
+  
   red <- 1-abs(color.matrix)/max(6, abs(color.matrix))*(color.matrix>0)
   blue <- 1-abs(color.matrix)/max(6, abs(color.matrix))*(color.matrix<0)
   green <- red*(color.matrix>0) + blue*(color.matrix<0) + 1*(color.matrix==0)
@@ -88,7 +95,8 @@ block.membership.plot <- function (membership.share, block.matrix,
                                    node.labels=1:dim(membership.share)[2], ...) {
   
   #membership.share=matrix(runif(20*2), nrow=2); block.matrix=matrix(2*runif(2*2)-1, nrow=2); main="Stochastic Block Model Outcome"
-
+  #print(block.matrix)
+  
   #what's the minimum number
   n.nodes <- dim(membership.share)[2]
   n.groups <- dim(membership.share)[1]
@@ -156,8 +164,10 @@ dotchart.coef <- function (values,
                            ...) {
   #values=rnorm(10); names=1:length(values); sd=NULL; interval=NULL
 
+  xlims <- values; if (!is.null(interval)) xlims <- c(interval) else if (!is.null(sd)) xlims <- c(xlims + 2*sd, xlims - 2*sd)
+  
   ypts <- -(1:length(values))
-  plot (range(c(values, 0)), c(-length(values)-0.5, -0.5), ty="n", axes=FALSE, xlab="Value", ylab="Covariate", main=main, ...)
+  plot (range(c(xlims, 0)), c(-length(values)-0.5, -0.5), ty="n", axes=FALSE, xlab="Value", ylab="Covariate", main=main, ...)
   box()
   axis(1)
   axis(2, ypts, names, las=2, cex.axis=3/sqrt(length(values)))
@@ -325,4 +335,7 @@ circular.dendrogram <- function (leaf.parents,
            
   
 }
+
+
+
 #circular.dendrogram (leaf.parents=sample(9, 100, replace=TRUE), internal.parents=c(0,1,1,2,2,1,4,4,1))

@@ -5,6 +5,9 @@
 
 #source("COV-reference.R"); source("SBM-reference.R"); source("LSM-reference.R"); source("SR-reference.R"); library(Rcpp); library(mvtnorm); library(msm); sourceCpp ("../src/cid.cpp"); source("CID-basefunctions.R"); 
 
+.onAttach <- function (...) {
+  packageStartupMessage("CIDnetworks v 0.2.5")
+}
 
 # All subclasses available to CID.
 
@@ -106,7 +109,7 @@ CIDnetwork <-
         if (!missing(sr.rows)) {
           .self$sr.rows <<- sr.rows
         } else {
-          .self$sr.rows <<- row.list.maker(edge.list)
+          .self$sr.rows <<- row.list.maker(.self$edge.list)
         }
 
         if (length(node.names) != .self$n.nodes) .self$node.names <<- as.character(1:.self$n.nodes) else .self$node.names <<- node.names
@@ -137,7 +140,13 @@ CIDnetwork <-
         #reinitialize components, just in case.
         if (length(components)>0) {
           if (class(components) != "list") components.t <- list(components) else components.t <- components
-          for (kk in 1:length(components.t)) components.t[[kk]]$reinitialize (n.nodes, edge.list, .self$node.names)
+          for (kk in 1:length(components.t)) {
+            components.t[[kk]]$reinitialize (n.nodes, edge.list, .self$node.names)
+            if (class(components.t[[kk]]) %in% c("SBMcid", "MMSBMcid", "HBMcid")) {
+              .self$intercept.m <<- 0
+              .self$intercept.v <<- 0.000000000001
+            }
+          }
           .self$components <<- components.t
         } else .self$components <- list()
         
@@ -370,6 +379,7 @@ CIDnetwork <-
         if (class.outcome == "gaussian") {
           update.comp.values()
           draw.variance(verbose)
+          update.comp.values()
         }
         
         update.log.likelihood()
@@ -385,11 +395,50 @@ CIDnetwork <-
 
       },
       
-      gibbs.full = function (report.interval=100, draws=100, burnin=0, thin=1,
+      gibbs.full = function (
+        report.interval=100, draws=100,
+        burnin=0, thin=10,   #auto-cut.
+        auto.burn.cut=TRUE,
+        auto.burn.count=200,
         make.random.start=TRUE) {
+
+        #if (auto.burn.cut) {thin <- 10; burnin <- 0}
+        if (thin < 1) stop ("thin must be an integer greater than zero.")
+        if (burnin < 0) stop ("burnin must be an integer greater than or equal to zero.")
+        if (burnin > 0) {
+          message ("Overriding auto burn-in and cut. Initially discarding ",burnin," iterations.")
+          auto.burn.cut <- FALSE
+        }
         
         out <- list()
         if (make.random.start) random.start()
+
+        if (auto.burn.cut) {
+          message ("CID Auto-Burning In")
+          repeat {
+            loglikes <- rep(NA, auto.burn.count)
+            theseruns <- 1:auto.burn.count
+            time.one <- proc.time()[3]
+            for (kk in theseruns) {
+              draw()
+              loglikes[kk] <- log.likelihood
+            }
+            time.two <- proc.time()[3] - time.one
+
+          #  obj1 <- lm(loglikes ~ theseruns)
+          #  slopes <- summary(obj1)$coef[2, c(1,4)]
+          #  if (slopes[1]<0 | slopes[2] > 0.05) break else message ("CID Still Auto-Burning In")
+          #  if (any(is.na(loglikes))) {print (loglikes)} else {
+            slopes <- sum(loglikes*(theseruns - mean(theseruns)))
+            if (is.na(slopes)) message ("CID Still Auto-Burning In") else if (slopes<0) break else message ("CID Still Auto-Burning In")
+            #}
+          }
+          
+          message ("CID Auto-Burned In. Estimated Seconds Remaining: ", round(time.two/auto.burn.count*thin*draws))
+          burnin <- 0
+        }
+
+        
         for (kk in 1:(draws*thin+burnin)) {
           draw();
           index <- (kk-burnin)/thin
@@ -400,9 +449,14 @@ CIDnetwork <-
             if (report.interval > 0) if (index %% report.interval == 0) message("CID burnin ",index)
           }
         }
+
+        
         return(out)
       },
 
+
+
+      
       gibbs.value = function (gibbs.out) sapply(gibbs.out, function(gg) {
         value.ext (gg)
       }),
@@ -419,41 +473,74 @@ CIDnetwork <-
         out <- list()
 
         out$intercept <- s.sum(unlist(switched[[1]]))
+        message ("Intercept:"); print(out$intercept)
+        
         out$residual.variance <- s.sum(unlist(switched[[2]]))
+        if (out$residual.variance[4] != 0) {  #SD
+          message ("Residual variance:")
+          print (out$residual.variance)
+        }
+        
         out$log.likelihood <- s.sum(unlist(switched[[3]]))
-        out$ordinal.cutoffs <- {
-          "To be added"
+        message ("Log likelihood:"); print(out$log.likelihood)
+
+        if (class.outcome == "ordinal") if (ordinal.count > 2) {
+          o1 <- matrix(unlist(switched[[4]]), nrow=ordinal.count-2)
+          out$ordinal.cutoffs <- t(apply(o1, 1, s.sum))
+          rownames(out$ordinal.cutoffs) <- paste("Cutoff", 1:(ordinal.count-2), 2:(ordinal.count-1), sep="-")
+          message ("Ordinal cutoffs:")
+          print (out$ordinal.cutoffs)
         }
         
         if (length(components) > 0) for (cc in 1:length(components)) {
-          out[[cc+4]] <- components[[cc]]$gibbs.summary(switched[[cc+4]])
+          message ("Component ", class(components[[cc]]),":")
+          out[[cc+4]] <- components[[cc]]$print.gibbs.summary(switched[[cc+4]])
           names(out)[cc+4] <- class(components[[cc]])
         }
-          
 
-        return(out)
+        return(invisible(out))
       },
 
-      gibbs.plot = function (gibbs.out, DIC=NULL, which.plots=1:(length(components)+4)) {
-        switched <- gibbs.switcheroo (gibbs.out)
+      
+      gibbs.plot = function (gibbs.out, DIC=NULL, which.plots=1:(length(components)+4), auto.layout=TRUE) {
         
-        if (1 %in% which.plots) plot.default (unlist(switched[[1]]), main="Grand Intercept")
-        if (2 %in% which.plots & class.outcome=="gaussian") plot.default (unlist(switched[[2]]), main="Residual Variance")
+        switched <- gibbs.switcheroo (gibbs.out)
+
+        if (auto.layout) {
+          if (intercept.v < 0.0001) which.plots <- which.plots[which.plots != 1]
+          if (class.outcome != "gaussian") which.plots <- which.plots[which.plots != 2]
+          if (ordinal.count == 2) which.plots <- which.plots[which.plots != 4]
+          cols <- ceiling(length(which.plots)/2)
+          par(mfrow=c(2, cols))
+        }
+        
+        if (1 %in% which.plots & intercept.v >= 0.0001) plot.default (unlist(switched[[1]]),
+                                              main="Grand Intercept",
+                                              xlab="Iteration",
+                                              ylab="Intercept")
+        if (2 %in% which.plots & class.outcome=="gaussian")
+          plot.default (unlist(switched[[2]]), main="Residual Variance",
+                                              xlab="Iteration",
+                                              ylab="Residual Variance")
         main.label <- "Log-likelihood"; if (!is.null(DIC)) main.label <- paste0(main.label, ": DIC = ",signif(DIC, 5))
         if (3 %in% which.plots)
-          plot.default (unlist(switched[[3]]), main=main.label)
+          plot.default (unlist(switched[[3]]), main=main.label,
+                                              xlab="Iteration",
+                                              ylab="Log Likelihood")
         if (4 %in% which.plots & class.outcome=="ordinal" & ordinal.count>2) {
           draws <- length(unlist(switched[[1]]))
           xx <- sort(rep(1:draws, ordinal.count-2))
           plot.default (c(1,xx), c(0,unlist(switched[[4]])), col=c(0, rep(1:(ordinal.count-2), draws)),
-                        main="Ordinal Cutoff Values")
+                        main="Ordinal Cutoff Values",
+                        xlab="Iteration",
+                        ylab="Cutoff Value")
           abline(h=0, col=8)
         }
-        
         
         if (length(components) > 0) for (cc in 1:length(components)) if (4+cc %in% which.plots) components[[cc]]$gibbs.plot(switched[[cc+4]])
         
       },
+      
       
       DIC = function (gibbs.out) {
         all.values <- gibbs.value(gibbs.out)
@@ -586,7 +673,8 @@ CID.Gibbs <- function (edge.list,
 
 
 print.CID.Gibbs <- function (x, ...) {
-  x$CID.object$show(...)
+  x$CID.object$gibbs.summary (x$results, ...)
+  #x$CID.object$show(...)
 }
 
 summary.CID.Gibbs <- function (object, ...) {
@@ -609,3 +697,27 @@ network.plot <- function (x, fitted.values=FALSE, ...) {
   
 }
 
+sociogram.plot <- function (x, component.color=0, ...) {
+
+  if (class(x) == "CID.Gibbs") {
+
+    #pull out the non-zero edge list.
+    edges <- x$CID.object$edge.list[x$CID.object$outcome > 0,]
+
+    vertexcolor <- rep("#DDDDFF", x$CID.object$n.nodes)
+    if (component.color > 0) {
+      if (component.color > length(x$CID.object$components)) stop ("Invalid component number for sociogram plot.")
+      
+      switched <- x$CID.object$gibbs.switcheroo(x$results)
+      vertexcolor <- x$CID.object$components[[component.color]]$gibbs.node.colors(switched[[component.color+4]])
+    
+    #weights <- x$outcome[x$outcome > 0]
+      plot(graph.edgelist(edges, directed=FALSE),
+           vertex.label=x$CID.object$node.names,
+           vertex.color=vertexcolor,
+           ...)
+    
+    }
+  
+  }
+}

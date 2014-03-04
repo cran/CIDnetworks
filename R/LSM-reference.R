@@ -100,6 +100,11 @@ LSMcid <-
           latent.space.pos <<- matrix(rnorm(dimension*n.nodes), nrow=n.nodes)
        #   adjust.lsp()
         }
+
+        if (ncol(latent.space.pos) > .self$n.nodes) {
+          warning ("Latent space has more dimensions than nodes. Not impossible, but probably counter-productive.")
+        }
+        
         if (!is.null(node.names)) {
           if (length(node.names) == .self$n.nodes) node.names <<- node.names
         } else node.names <<- as.character(1:.self$n.nodes)        
@@ -210,12 +215,23 @@ LSMcid <-
         lsp.all <- sapply(gibbs.out, function(gg) gg$latent.space.pos)
         output <- matrix(apply(lsp.all, 1, mean), nrow=n.nodes)
         rownames(output) <- node.names
+        colnames(output) <- paste0("pos",1:ncol(output))
         return(output)
+      },
+      print.gibbs.summary = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+        message ("Mean Latent Space Positions:")
+        print(get.sum)
+        return(invisible(get.sum))
       },
       
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
         plot (get.sum, main = "Mean Latent Space Positions from Gibbs Sampler", ...)
+      },
+
+      gibbs.node.colors = function (gibbs.out) {
+        rep("#DDDDFF", n.nodes)
       }
       
       )

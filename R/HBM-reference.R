@@ -88,7 +88,7 @@ HBMcid <-
         
         shift=0,
         
-        restrict.and.shift=TRUE,
+        restrict.and.shift=FALSE,
         generate=FALSE
         
         ) {
@@ -134,10 +134,22 @@ HBMcid <-
           edge.list <<- edge.list
           sr.rows <<- row.list.maker(edge.list)
         }
+
+        
+        if (n.groups > n.nodes) {
+          warning ("HBM: Resetting number of groups to one less than the number of nodes.")
+          n.groups <<- n.nodes - 1
+          membership <<- sample(n.groups, n.nodes, replace=TRUE)
+          block.value <<- block.value[1:n.groups]
+        }
+
+        
         if (length(membership) != n.nodes) {
           message ("Reinitializing HBM Membership Vector")
           membership <<- sample(n.groups, n.nodes, replace=TRUE)
         }
+
+        
         if (!is.null(node.names)) {
           if (length(node.names) == .self$n.nodes) node.names <<- node.names
         } else node.names <<- as.character(1:.self$n.nodes)
@@ -305,16 +317,31 @@ HBMcid <-
       }),
 
       gibbs.summary = function (gibbs.out) {
-        message("Note: HBM is not built for summaries over the posterior, only maximal draws.")
+        #message("Note: HBM is not built for summaries over the posterior, only maximal draws.")
         return(gibbs.out[[length(gibbs.out)]])
+      },
+      print.gibbs.summary = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+        message ("Last state of the Markov Chain: Membership")
+        print(get.sum$membership)
+        message ("Internal tree parents:")
+        print(get.sum$tree.parent)
+        message ("Block values:")
+        print(get.sum$block.value)
       },
       
       gibbs.plot = function (gibbs.out) {
-        message("Note: HBM is not built for summaries over the posterior, only maximal draws.")
+        #message("Note: HBM is not built for summaries over the posterior, only maximal draws.")
         #print(gibbs.out[[length(gibbs.out)]])
-        plot (gibbs.out[[length(gibbs.out)]]$membership,
-              gibbs.out[[length(gibbs.out)]]$tree.parent,
-              gibbs.out[[length(gibbs.out)]]$block.value)
+        get.sum <- gibbs.summary(gibbs.out)
+        plot (get.sum$membership,
+              get.sum$tree.parent,
+              get.sum$block.value)
+      },
+
+      gibbs.node.colors = function (gibbs.out, colors=(1:n.groups) + 1) {
+        get.sum <- gibbs.summary(gibbs.out)
+        return(colors[get.sum$membership])
       }
       
 

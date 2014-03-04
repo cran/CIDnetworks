@@ -160,10 +160,21 @@ COVcid <-
         rownames(ob1) <- cov.names
         ob1
       },
+      print.gibbs.summary = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+        message ("Coefficients:")
+        print (get.sum)
+        return(invisible(get.sum))
+      },
 
+      
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
         plot (get.sum[,1], interval = get.sum[,3:4], main = "Covariate Summary from Gibbs Sampler", ...)
+      },
+
+      gibbs.node.colors = function (gibbs.out) {
+        rep("#DDDDFF", n.nodes)
       }
       
       )

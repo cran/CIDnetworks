@@ -61,7 +61,7 @@ SBMcid <-
         membership.a=matrix(1, nrow=n.nodes, ncol=n.groups),
         shift=0,
 
-        restrict.and.shift=TRUE,
+        restrict.and.shift=FALSE,
         generate=FALSE
         
         ) {
@@ -114,6 +114,16 @@ SBMcid <-
           edge.list <<- edge.list
           sr.rows <<- row.list.maker(edge.list)
         }
+
+        if (n.groups > n.nodes) {
+          warning ("SBM: Resetting number of groups to one less than the number of nodes.")
+          n.groups <<- n.nodes - 1
+          b.vector <<- rep(0, n.groups*(n.groups+1)/2)
+          
+          membership <<- sample(n.groups, n.nodes, replace=TRUE)
+          membership.a <<- matrix(1, nrow=n.nodes, ncol=n.groups)
+        }
+        
         if (length(membership) != n.nodes) {
           message ("Reinitializing SBM Memberships")
           membership <<- sample(n.groups, n.nodes, replace=TRUE)
@@ -276,14 +286,42 @@ SBMcid <-
         }
         colnames(membs1) <- node.names
         bvec <- apply(sapply(gibbs.out, function(gg) gg$b.vector), 1, mean)
-        return(list(membership=membs1, b.vector=bvec, block=symBlock(bvec)))
+        modal.membership <- apply(membs1, 2, which.max)
+        return(list(membership=membs1,
+                    modal.membership=modal.membership,
+                    b.vector=bvec,
+                    block=symBlock(bvec)))
+      },
+      print.gibbs.summary = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+        message ("Probabilistic block memberships:")
+        print (get.sum$membership)
 
+        message ("Modal block memberships:")
+        print (get.sum$modal.membership)
+
+        message ("Block value matrix:")
+        print (get.sum$block)
+        
+        return(invisible(get.sum))
+      },
+
+      gibbs.node.order = function (gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
       },
       
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
-        block.membership.plot (get.sum[[1]], symBlock(get.sum[[2]]), node.labels=node.names, main = "SBM Summary from Gibbs Sampler", ...)
+        block.membership.plot (get.sum$membership, get.sum$block, node.labels=node.names,
+                               main = "SBM Summary from Gibbs Sampler", ...)
+      },
+
+      gibbs.node.colors = function (gibbs.out, colors=(1:n.groups) + 1) {
+        get.sum <- gibbs.summary(gibbs.out)
+        return(colors[get.sum$modal.membership])
       }
+
+      
 
 
       )

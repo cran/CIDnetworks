@@ -33,6 +33,6 @@ Maintainer: A.C. Thomas <act@acthomas.ca>
 \examples{
 
   data(dolphins)
-  model.plain <- CID.Gibbs (edge.list=dolphins, draws=10)
+  model.plain <- CID.Gibbs (edge.list=dolphins, burnin=10, draws=10)
 
 }

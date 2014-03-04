@@ -3,7 +3,7 @@ Checking the CIDnetworks Suite: Basic Modes
 
 A.C. Thomas, November 21
 
-This vignette contains testing programs for the master CID class, with no subclasses attached -- the Gilbert model for random graphs, essentially. This is done to ensure that the underlying mechanics are correctly specified.
+This vignette contains testing programs for the master CID class, with no subclasses attached -- the Gilbert model for random graphs, essentially. This is done to ensure that the underlying mechanics are correctly specified. This style should not be used in a real application!
 
 `r library(CIDnetworks)`
 
@@ -19,7 +19,7 @@ Z_{ij} \sim N(\mu, 1); Y_{ij} = \mathbb{I}(Z_{ij} > 0)
 $$
 
 ```{r fig.width=8}
-basic.b <- CID.generate (100, intercept=1, generate=TRUE)   #class.outcome="binary" can also be used.
+basic.b <- CID.generate (n.nodes=100, intercept=1, generate=TRUE)   #class.outcome="binary" can also be used.
 basic.b.pieces <- basic.b$pieces()
 basic.b
 ```
@@ -27,7 +27,7 @@ basic.b
 Let's see the edges:
 
 ```{r fig.width=8, fig.height=8}
-netplot(basic.b$edge.list, basic.b$outcome)
+basic.b$plot.network()
 ```
 
 Now run the Gibbs sampler for this model directly.
@@ -37,22 +37,6 @@ basic.b.gibbs <- basic.b$gibbs.full(draws=200, report=200, thin=2, make.random.s
 par(mfrow=c(2,2)); basic.b$gibbs.plot(basic.b.gibbs)
 ```
 
-```{r fig.width=8, fig.height=8}
-basic.b.gibbs.unwind <- list.output.to.matrices (basic.b.gibbs)
-plot(basic.b.gibbs.unwind$intercept, main="Intercept"); abline(h=basic.b.pieces$intercept, col=2, lwd=3)
-```
-
-The residual variance here is an artifact -- it always equals 1 in the binary case. Let's check it to be sure.
-
-```{r fig.width=8, fig.height=8}
-plot(basic.b.gibbs.unwind$residual.variance, main="Residual Variance"); abline(h=basic.b.pieces$residual.variance, col=2, lwd=3)
-```
-
-Finally, the log likelihood of the data at each iteration.
-
-```{r fig.width=8, fig.height=8}
-plot(basic.b.gibbs.unwind$log.likelihood, main="Log Likelihood")
-```
 
 Basic Structure: Gaussian data
 ------------------------------
@@ -64,7 +48,7 @@ Y_{ij} \sim N(\mu, \sigma^2)
 $$
 
 ```{r}
-basic <- CID.generate (100, intercept=1, residual.variance=2, generate=TRUE, class="gaussian")
+basic <- CID.generate (n.nodes=100, intercept=1, residual.variance=2, generate=TRUE, class="gaussian")
 basic
 basic.pieces <- basic$pieces()
 basic.gibbs <- basic$gibbs.full(draws=200, report=200, thin=2, make.random.start=TRUE)
@@ -91,19 +75,11 @@ Z_{ij} \sim N(\mu, 1); Y_{ij} = \mathbb{I}(Z_{ij} > 0) + \sum_{k=1}^{c-2} \mathb
 $$
 
 ```{r fig.width=8, fig.height=8}
-basic.o <- CID.generate (100, intercept=1, generate=TRUE, class.outcome="ordinal", ordinal.count=4)
+basic.o <- CID.generate (n.nodes=100, intercept=1, generate=TRUE, class.outcome="ordinal", ordinal.count=4)
 basic.o
 table(basic.o$outcome)
 netplot(basic.o$edge.list, basic.o$outcome)
 basic.o.pieces <- basic.o$pieces()
 basic.o.gibbs <- basic.o$gibbs.full(draws=100, report=100, burnin=100, thin=5, make.random.start=TRUE)
-```
-
-```{r fig.width=8, fig.height=8}
-basic.o.gibbs.unwind <- list.output.to.matrices (basic.o.gibbs)
-#par(mfrow=c(1,3))
-plot(basic.o.gibbs.unwind$intercept, main="Intercept"); abline(h=basic.o.pieces$intercept, col=2, lwd=3)
-plot(basic.o.gibbs.unwind$ordinal.cutoffs1, main="Ordinal Cutoff 1|2"); abline(h=basic.o.pieces$ordinal.cutoffs1, col=2, lwd=3)
-plot(basic.o.gibbs.unwind$ordinal.cutoffs2, main="Ordinal Cutoff 2|3"); abline(h=basic.o.pieces$ordinal.cutoffs2, col=2, lwd=3)
-plot(basic.o.gibbs.unwind$log.likelihood, main="Log Likelihood")
+basic.o$gibbs.plot(basic.o.gibbs)
 ```
