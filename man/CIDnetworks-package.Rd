@@ -15,8 +15,8 @@ structure.
 \tabular{ll}{
 Package: \tab CIDnetworks\cr
 Type: \tab Package\cr
-Version: \tab 0.1\cr
-Date: \tab 2014-01-20\cr
+Version: \tab 0.6.0\cr
+Date: \tab 2014-06-18\cr
 License: \tab GPLv3\cr
 }
 
@@ -25,14 +25,11 @@ License: \tab GPLv3\cr
 Beau Dabbs, Brian Junker, Mauricio Sadinle, Tracy Sweet, A.C. Thomas 
 Maintainer: A.C. Thomas <act@acthomas.ca>
 }
-\references{
-  Forthcoming.
-}
 
 \keyword{ package }
 \examples{
 
   data(dolphins)
-  model.plain <- CID.Gibbs (edge.list=dolphins, burnin=10, draws=10)
+  model.plain <- CID.Gibbs (input=dolphins, burnin=10, draws=10)
 
 }

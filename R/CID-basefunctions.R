@@ -22,6 +22,12 @@ rdirichlet.block <- function(node.block) {   #blocks-by-nodes
   t(r1/rowSums(r1))
 }
 
+#Log of the inverse gamma density.
+my.dinvgamma <- function (x, a, b) -a*log(b) - lgamma(a) - (a+1)*log(x) - b/x
+
+
+
+non.diag <- function(nn) as.logical(1-diag(nn))
 
 l.diag <- function(nn) {
   out <- NULL
@@ -42,8 +48,42 @@ ordinal.maker <- function (vec, cuts=quantile(vec, c(0.25, 0.5, 0.75))) {
 }
 
 
+my.pmvnorm <- function (lower, #n-by-2
+                        upper, #n-by-2
+                        meanval, #n-by-2
+                        sigma, #1
+                        rho,
+                        log=TRUE) { #1
+
+  ## lower=matrix(c(-2:2/2, -2:2/2), ncol=2); upper=1+lower; meanval=0; sigma=1; rho=0.2
+  ## lower=matrix(rep(-Inf, 10), ncol=2); upper=matrix(seq(-5,5,length=10), ncol=2); meanval=0; sigma=1; rho=0.2
+  ## lower=matrix(seq(-5,5,length=10), ncol=2); upper=matrix(rep(Inf,10), ncol=2); meanval=0; sigma=1; rho=0.2
+  
+  new.lower <- (lower - meanval)/sigma
+  new.upper <- (upper - meanval)/sigma
+
+  new.lower[new.lower>50] <- 50
+  new.lower[new.lower< -50] <- -50
+  
+  new.upper[new.upper>50] <- 50
+  new.upper[new.upper< -50] <- -50
+  
+  xx <- c(new.upper[,1], new.lower[,1], new.upper[,1], new.lower[,1])
+  yy <- c(new.upper[,2], new.upper[,2], new.lower[,2], new.lower[,2])
+
+  r1 <- matrix(pbivnorm(xx,yy,rho), ncol=4)  #library(pbivnorm)
+  if (any(is.na(r1))) warning ("Missing values returned from bivariate normal CDF.")
+  r1[,2:3] <- -r1[,2:3]
+  
+  output <- apply(r1, 1, sum)
+  if (log) return(log(output)) else return(output)
+}
+
+
 
 #Link to C++ function.
+
+make.arc.list <- function (nn=10) makeArcList(nn)
 make.edge.list <- function (nn=10) makeEdgeList(nn)
 #includes self-edges.
 make.edge.list.selfies <- function (nn=10) makeEdgeListSelfies(nn)

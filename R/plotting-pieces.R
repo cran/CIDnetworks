@@ -6,7 +6,7 @@
 
 
 # image plot for a network.
-netplot <- function (edge.list, outcome,
+image.netplot <- function (edge.list, outcome,
                      extremes=range(outcome),
                      colvalues=10,
                      col1="white", col2="black",
@@ -14,20 +14,32 @@ netplot <- function (edge.list, outcome,
                      colpalette=colorRampPalette(c(col1,col2)),
                      n.nodes=max(c(edge.list)),
                      lwd=0.1,
-                     symmetric=TRUE,
+
                      node.labels=1:n.nodes,
                      label.cex=10/n.nodes,
 
                      node.order=1:n.nodes,
                      ...) {
   #edge.list=make.edge.list(10); outcome=seq(0, 1, length=nrow(edge.list)); extremes=range(outcome); colvalues=2; col1="white"; col2="black"; colpalette=colorRampPalette(c(col1,col2)); n.nodes=max(c(edge.list)); symmetric=TRUE; null.color="#004400"
-  
+
+  ##  symmetric=TRUE,
+  val1 <- unique(edge.list)
+  val2 <- unique(rbind(val1, val1[,2:1]))
+
+  ## is there any overlap? If not, symmetric plot.
+  symmetric <- (nrow(val2) == 2*nrow(val1))
+
   plot(c(-1, n.nodes), c(-1, n.nodes), ty="n", axes=FALSE, xlab="", ylab="", ...)
   rect(0, 0, n.nodes, n.nodes, col=null.color)
   colseq <- colpalette(colvalues)[as.numeric(cut(outcome, breaks=seq(min(extremes), max(extremes), length=colvalues+1), include.lowest=TRUE))]
 
+  f.order <- rep(NA,length(node.order))
+  for(ii in 1:length(node.order)){
+      f.order[node.order[ii]] <- ii
+  }
+  node.order <- f.order
   reordered.edge.list <- array(node.order[edge.list], dim(edge.list))
-  
+
   rect(reordered.edge.list[,1]-1, reordered.edge.list[,2]-1,
        reordered.edge.list[,1], reordered.edge.list[,2], col=colseq, lwd=lwd)
   if (symmetric) rect(reordered.edge.list[,2]-1, reordered.edge.list[,1]-1,
@@ -35,7 +47,7 @@ netplot <- function (edge.list, outcome,
 
   text(1:n.nodes - 0.5, rep(-0.5, length(n.nodes)), node.labels[node.order], cex=label.cex)
   text(rep(0, length(n.nodes)), 1:n.nodes - 0.5, node.labels[node.order], cex=label.cex, pos=2)
-  
+
 }
 
 
@@ -46,7 +58,7 @@ netplot <- function (edge.list, outcome,
 
 project.into.2d <- function(point.matrix) {  #which is n-by-k.
   #point.matrix=matrix(rnorm(4*900), ncol=4)
-  
+
   if (ncol(point.matrix) > 2) {
     new.2d <- princomp(point.matrix)$scores[,1:2]
   } else if (ncol(point.matrix) == 2) {new.2d <- point.matrix} else
@@ -58,7 +70,7 @@ project.into.2d <- function(point.matrix) {  #which is n-by-k.
 
 latent.space.plot <- function (point.matrix, arrowlines=FALSE, labels=1:nrow(point.matrix), ...) {
   #point.matrix=matrix(rnorm(4*900), ncol=4)
-  
+
   n.nodes <- nrow(point.matrix)
   twod.points <- project.into.2d (point.matrix)
   plot(twod.points, ty="n", ...)
@@ -75,31 +87,33 @@ latent.space.plot <- function (point.matrix, arrowlines=FALSE, labels=1:nrow(poi
 ###############################################################
 # Block membership plots.
 
-number.to.vector <- function(number.membership.vector, n.groups=max(number.membership.vector)) 
+number.to.vector <- function(number.membership.vector, n.groups=max(number.membership.vector))
   sapply(number.membership.vector, function(kk) {out <- rep(0, n.groups); out[kk] <- 1; out})
 
 
 color.block.one <- function(color.matrix) {
   #color.matrix = -4:4
   #print(color.matrix)
-  
+
   red <- 1-abs(color.matrix)/max(6, abs(color.matrix))*(color.matrix>0)
   blue <- 1-abs(color.matrix)/max(6, abs(color.matrix))*(color.matrix<0)
   green <- red*(color.matrix>0) + blue*(color.matrix<0) + 1*(color.matrix==0)
-    
+
   rgb(red, green, blue)
 }
 
-block.membership.plot <- function (membership.share, block.matrix,
+block.membership.plot <- function (membership.share,
+                                   block.matrix,
                                    main="Stochastic Block Model Outcome",
                                    node.labels=1:dim(membership.share)[2], ...) {
-  
+
   #membership.share=matrix(runif(20*2), nrow=2); block.matrix=matrix(2*runif(2*2)-1, nrow=2); main="Stochastic Block Model Outcome"
   #print(block.matrix)
-  
+
   #what's the minimum number
-  n.nodes <- dim(membership.share)[2]
-  n.groups <- dim(membership.share)[1]
+  n.nodes <- ncol(membership.share)
+  n.groups <- nrow(block.matrix)  #
+  n.groups.known <- nrow(membership.share)
   min.x <- n.groups + n.nodes + 2
   min.y <- n.groups + 2
   width <- ceiling(sqrt(min.x*min.y))
@@ -136,7 +150,7 @@ block.membership.plot <- function (membership.share, block.matrix,
   rect(x.grid, -y.grid, x.grid+1, -(y.grid+1), col=block.col)
   text(rep(max(new.x - n.groups + 0.5), n.groups), -(y.grid + 0.5), 1:n.groups)
   text(x.points+0.5, -rep(max(new.y - n.groups + 0.5), n.groups), 1:n.groups)
-  
+
 }
 
 
@@ -145,10 +159,10 @@ single.membership.plot <- function (number.membership,
                                     main="Stochastic Block Model Outcome",
                                     ...) {
   #number.membership=sample(4, 100, replace=TRUE)
-  
+
   block.membership <- number.to.vector (number.membership, dim(block.matrix)[1])
   block.membership.plot  (block.membership, block.matrix, main=main, ...)
-  
+
 }
 
 
@@ -165,7 +179,7 @@ dotchart.coef <- function (values,
   #values=rnorm(10); names=1:length(values); sd=NULL; interval=NULL
 
   xlims <- values; if (!is.null(interval)) xlims <- c(interval) else if (!is.null(sd)) xlims <- c(xlims + 2*sd, xlims - 2*sd)
-  
+
   ypts <- -(1:length(values))
   plot (range(c(xlims, 0)), c(-length(values)-0.5, -0.5), ty="n", axes=FALSE, xlab="Value", ylab="Covariate", main=main, ...)
   box()
@@ -183,14 +197,60 @@ dotchart.coef <- function (values,
     if (nrow(interval) != length(values)) stop ("Row count of interval matrix does not match length of values.")
     segments(interval[,1], ypts, interval[,2], col=2, lwd=3)
   }
-  
+
 }
+
+
+dotchart.two <- function (a.values,
+                          b.values,
+
+                          node.names=1:length(a.values),
+
+                          sd.a=NULL,
+                          interval.a=NULL,
+
+                          sd.b=NULL,
+                          interval.b=NULL,
+
+                          xlab="Sender Effect",
+                          ylab="Receiver Effect",
+
+                          main="",
+                          ...) {
+
+  xlims <- a.values
+  if (!is.null(interval.a)) xlims <- c(interval.a) else if (!is.null(sd.a)) xlims <- c(xlims + 2*sd.a, xlims - 2*sd.a)
+  ylims <- b.values
+  if (!is.null(interval.b)) ylims <- c(interval.b) else if (!is.null(sd.b)) ylims <- c(ylims + 2*sd.b, ylims - 2*sd.b)
+
+  plot (range(c(xlims, 0)), range(c(ylims, 0)), ty="n", xlab=xlab, ylab=ylab, main=main, ...)
+
+  if (!is.null(sd.a)) {
+    if (length(sd.a) != length(a.values)) stop ("Length of SD vector does not match length of a.values.")
+    segments(a.values-2*sd.a, b.values, a.values+2*sd.a, b.values, col=2, lwd=3)
+    if (length(sd.b) != length(b.values)) stop ("Length of SD vector does not match length of b.values.")
+    segments(a.values, b.values-2*sd.b, a.values, b.values+2*sd.b, col=2, lwd=3)
+  }
+  if (!is.null(interval.a)) {
+    if (nrow(interval.a) != length(a.values)) stop ("Row count of interval.a matrix does not match length of a.values.")
+    segments(interval.a[,1], b.values, interval.a[,2], b.values, col=2, lwd=3)
+    if (nrow(interval.b) != length(b.values)) stop ("Row count of interval.b matrix does not match length of b.values.")
+    segments(a.values, interval.b[,1], a.values, interval.b[,2], col=2, lwd=3)
+
+  }
+
+  text (a.values, b.values, node.names)
+
+}
+
+
+
 
 
 ###############################################################
 # Modified dendrograms with internal nodes.
 
-    
+
 simple.split <- function (input) {
   if (length(input)>1) {
     l1 <- sample(c(floor(length(input)/2), ceiling(length(input)/2)))
@@ -201,22 +261,22 @@ simple.split <- function (input) {
 
 dendrogram.internals <- function (leaf.parents, internal.parents) { #, block.values=rep(0, length(internal.parents)) {
   #internal.parents=c(0,1,1,2,2,1,4,4,1); leaf.parents=sample(9, 100, replace=TRUE)
-  
+
   #start with ordering.
   n.nodes <- length(leaf.parents)
   done <- 0*internal.parents
   depth <- rep(NA, length(internal.parents))
   #descendant.count <- 0*internal.parents
-  
+
   current.internal <- which(internal.parents == 0)
   layout.vector <- current.internal
   depth[current.internal] <- 0
-  
+
   while (any(done==0)) {
-    
+
     descendants <- which(internal.parents == current.internal)
     depth[descendants] <- depth[current.internal]+1
-    
+
     pos1 <- which(layout.vector == current.internal)
     if (pos1 > 1) lv.left <- layout.vector[1:(pos1-1)] else lv.left <- NULL
     if (pos1 < length(layout.vector)) lv.right <- layout.vector[(pos1+1):length(layout.vector)] else lv.right <- NULL
@@ -266,7 +326,7 @@ circular.dendrogram <- function (leaf.parents,
   #internal.parents=c(0,1,1,2,2,1,4,4,1); leaf.parents=sample(9, 100, replace=TRUE); block.values=rep(0, length(internal.parents))
   n.nodes <- length(leaf.parents)
   n.groups <- length(internal.parents)
-  
+
   dend.ints <- dendrogram.internals(leaf.parents, internal.parents)
   polar.to.xy <- function(radius, angle)    #angle goes from 0:1.
     radius*cbind(cos(angle*2*pi), sin(angle*2*pi))
@@ -285,7 +345,7 @@ circular.dendrogram <- function (leaf.parents,
                         seq(0,1.001, length=1000))
     lines(xyr, col=8, lty=3)
   }
-  
+
   #Go Leaves Go!
   text (xy.leaves[,1], xy.leaves[,2], node.labels, cex=sqrt(50)/sqrt(n.nodes))
 
@@ -300,7 +360,7 @@ circular.dendrogram <- function (leaf.parents,
   outs <- polar.to.xy (rep(0.97, n.nodes), dend.ints$actual.x)
   segments (ins[,1], ins[,2], outs[,1], outs[,2], lwd=2)
 
-  
+
   #internal nodes.
   #arc-ties.
   xy.int.ends <- polar.to.xy (rep(0.93, n.groups), dend.ints$internal.x.pos/n.nodes)
@@ -308,7 +368,7 @@ circular.dendrogram <- function (leaf.parents,
             xy.int.ends[,1], xy.int.ends[,2],
             lwd=2)
 
-  #internal ties: just straight lines sucks! 
+  #internal ties: just straight lines sucks!
 
   parent.set <- unique(internal.parents[internal.parents != 0])
   for (kk in parent.set) {
@@ -317,13 +377,13 @@ circular.dendrogram <- function (leaf.parents,
     range.pts <- seq(min(picks), max(picks), by=0.01)
     lines (polar.to.xy(rep(subradius, length(range.pts)), range.pts/n.nodes), lwd=2)
   }
-  
+
   #short lines from master arcs.
   segments (xy.internals[internal.parents != 0, 1], xy.internals[internal.parents != 0, 2],
             xy.internals.2[internal.parents != 0, 1], xy.internals.2[internal.parents != 0, 2],
             lwd=2)
 
-    
+
 
   points(xy.internals,
          pch=19,
@@ -332,8 +392,8 @@ circular.dendrogram <- function (leaf.parents,
          pch=19,
          cex=6*sqrt(5)/nrow(xy.internals),
          col=color.block.one(block.values))
-           
-  
+
+
 }
 
 

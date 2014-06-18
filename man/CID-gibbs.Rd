@@ -2,10 +2,30 @@
 \alias{CID.Gibbs}
 \alias{network.plot}
 \alias{sociogram.plot}
-\alias{unwrap.CID.Gibbs}
 \alias{print.CID.Gibbs}
-\alias{plot.CID.Gibbs}
 \alias{summary.CID.Gibbs}
+\alias{print.summary.CID.Gibbs}
+\alias{plot.CID.Gibbs}
+\alias{likelihood.plot}
+\alias{intercept.plot}
+\alias{COV.plot}
+\alias{LSM.plot}
+\alias{SBM.plot}
+\alias{MMSBM.plot}
+\alias{SR.plot}
+\alias{n.nodes}
+\alias{edge.list}
+\alias{outcome}
+\alias{is.net.directed}
+\alias{net.density}
+\alias{node.names}
+\alias{inDegree}
+\alias{outDegree}
+\alias{socio}
+\alias{value.mat}
+\alias{switcheroo}
+
+
 
 \title{CIDnetworks: Bayesian Inference}
 \description{
@@ -13,61 +33,101 @@
 }
 \usage{
 
-  CID.Gibbs (edge.list,
+  CID.Gibbs (input,
              outcome,
-             sociomatrix,
 
-             CID.object,
+             components = list(),
+             class.outcome = NULL,
+             fill.in.missing.edges = missing(outcome),
+             new.chain = FALSE,
 
-             components=list(),
-             class.outcome=NULL,
-             fill.in.missing.edges=missing(outcome),
-                         
+             draws = 100,
+             burnin = -1,
+             thin = 10,            
              ...)
-  unwrap.CID.Gibbs (gibbs.out)
 
   \method{print}{CID.Gibbs} (x, \dots)
   \method{summary}{CID.Gibbs} (object, \dots)
   \method{plot}{CID.Gibbs} (x, \dots)
+  \method{print}{summary.CID.Gibbs} (x, \dots)
+
+  likelihood.plot(x, ...)
+  intercept.plot(x, trace = FALSE, ...)
+  COV.plot(x, ...)
+  LSM.plot(x, ...)
+  SBM.plot(x, ...)
+  MMSBM.plot(x, ...)
+  SR.plot(x, ...)
 
   network.plot (x, fitted.values=FALSE, ...)
-  sociogram.plot (x, component.color=0, ...)
+  sociogram.plot (x, component.color=0, vertexcolor, ...)
+
+  n.nodes(object)
+  edge.list(object)
+  is.net.directed(object)
+  net.density(object)
+  outcome(object)
+  node.names(object)
+  inDegree(object)
+  outDegree(object)
+  socio(object)
+  value.mat(CID.Gibbs.object, prob = TRUE)
+  switcheroo(CID.Gibbs.object)  
  
   
 
 }
 \arguments{
 
-  \item{edge.list}{A list of (potential) edges present in the network.}
-  \item{outcome}{The outcome on each of these edges.}
-  \item{sociomatrix}{If preferred, a sociomatrix of edges and
-  values. The lower triangle will be taken in.}
+  \item{input}{An object containing information about the edges in a
+    network.  Must be one of the following classes:  Matrix, CIDnetwork, or
+    CID.Gibbs.  If input is a square matrix, it is assumed to be a
+    sociomatrix.  Otherwise a matrix with 2 columns and a number of rows
+    equal to the number of edges is required.  Providing a CIDnetwork will
+    use the associated edge.list.  Providing a CID.Gibbs object will
+    continue the MCMC chain from the last draw.}
 
-  \item{CID.object}{If desired, an existing CID object can be loaded
-  instead of a new network specification.}
-
+  \item{outcome}{If an edgelist is provided as input and outcome is
+    missing, the edges provided are assumed to be the ones in a binary
+    sociomatrix.  Otherwise, an outcome value must be specified for each
+    edge in the edgelist, and any edges not provided are assumed to have
+    no data.}
+  
+  \item{CID.Gibbs.object}{If desired, an existing CID.Gibbs output object can be loaded
+    instead of a new network specification.}
+  
   \item{components}{A list of sub-components, including (COV, HBM, LSM,
-  LVM, MMSBM, SBM, SR).}
+    LVM, MMSBM, SBM, SR).}
   \item{class.outcome}{One of "ordinal" (default, values from 0 to
-  higher integers), "binary" (ordinal in 0 and 1) or "gaussian"
-  (unbounded continuous values). Class is auto-detected if NULL remains
-  in place.}
+    higher integers), "binary" (ordinal in 0 and 1) or "gaussian"
+    (unbounded continuous values). Class is auto-detected if NULL remains
+    in place.}
   \item{fill.in.missing.edges}{If TRUE, the edge list will be augmented
-  with zeroes for all unspecified but possible edges. By default, if an
-  outcome is specified, these edges will not be added.}
+    with zeroes for all unspecified but possible edges. By default, if an
+    outcome is specified, these edges will not be added.}
+  \item{new.chain}{If a CID.Gibbs object is provided, the default value
+    of FALSE will return both the old and new MCMC chain combined.  A
+    value of TRUE will drop the old chain completely.}
+  \item{draws}{Number of draws to return.}
+  \item{burnin}{Number of draws to burnin.  A negative value will
+    automatically determine burnin amount.}
+  \item{thin}{Amount of draws to thin the chain by.}
+    
   
   \item{...}{Further arguments to be passed to the Gibbs sampler
-  routine. See details for more.}
-
-  \item{gibbs.out}{The list object of draws from the Gibbs sampler. This
-    re-sorts the object into a matrix form for easier consumption.}
-
+    routine or the plot routine. See details for more.}
+  
   \item{x, object}{An object outputted from CID.Gibbs.}
   \item{fitted.values}{If TRUE, plots the fitted tie strength under the
     Gibbs sampler. If FALSE, plots the network outcomes as entered.}
   \item{component.color}{If non-zero, colors the nodes in the sociogram
     according to the output of the Gibbs sampler.}
-  
+  \item{vertexcolor}{User-passed vertex colors for sociogram.plot .}
+
+	\item{trace}{If selected, displays the Gibbs sampler trace plot for
+	the intercept rather than a point and interval.}
+	\item{prob}{In value.mat, converts the linear predictor value to the
+	probability of a binary edge.}
      
 }
 \details{

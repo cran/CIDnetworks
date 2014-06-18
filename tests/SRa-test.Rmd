@@ -1,0 +1,63 @@
+Checking the CIDnetworks Suite: Covariates (COV)
+========================================================
+
+A.C. Thomas, November 22
+
+Here we test the fitting and plotting options for SR, the asymmetric sender-receiver component.
+
+Component alone.
+
+```{r echo=FALSE}
+library(CIDnetworks)
+
+n.nodes <- 100
+test.sr <- SR(n.nodes=100, generate=TRUE)
+test.sr.pieces <- test.sr$pieces()
+test.sr.value <- test.sr$value()
+
+test.sr$random.start()
+test.sr$draw()
+
+test.sr.gibbs <- test.sr$gibbs.full(draws=500, report=100, burnin=200, thin=2, make.random.start=TRUE)
+test.sr$gibbs.summary(test.sr.gibbs)
+test.sr$gibbs.plot(test.sr.gibbs)
+
+test.sr.gibbs.unlist <- list.output.to.matrices (test.sr.gibbs)
+
+test.sr.gibbs.value <- test.sr$gibbs.value(test.sr.gibbs)
+plot(test.sr.gibbs.unlist$log.lik, main="Log-likelihood")
+plot(test.sr.gibbs.unlist$coef.sr[1,], main=paste("Coefficient 1", test.sr.pieces$coef.sr[1])); abline(h=test.sr.pieces$coef.sr[1], lwd=3, col=2)
+
+test.sr$plot.network()
+test.sr$gibbs.plot(test.sr.gibbs)
+
+test.sr$netplot(test.sr$edge.list, , colvalues=20, main="Oracle values")
+test.sr$plot.network(test.sr.value)
+test.sr$plot.network(apply(test.sr.gibbs.value, 1, mean))
+
+```
+
+Binary within CID:
+
+```{r}
+test.sr.b <- CID.generate (n.nodes=100, components=list(COV(covariates=matrix(rbinom(covs*n.nodes*(n.nodes-1)/2, 1, 0.5), ncol=3), coef.sr=1:covs)), intercept=-3, residual.variance=2)
+
+
+test.sr.b.pieces <- test.sr.b$pieces()
+test.sr.b.value <- test.sr.b$value()
+
+test.sr.b.gibbs <- test.sr.b$gibbs.full(draws=1000, report=100, burnin=1000, make.random.start=TRUE)
+test.sr.b.gibbs.value <- test.sr.b$gibbs.value(test.sr.b.gibbs)
+
+test.sr.b$gibbs.plot (test.sr.b.gibbs)
+
+color.range <- range(c(test.sr.b.value, apply(test.sr.b.gibbs.value, 1, mean)))
+test.sr.b$plot.network(test.sr.b.value)
+test.sr.b$plot.network(apply(test.sr.b.gibbs.value, 1, mean))
+
+
+plot(jitter(test.sr.b.value), jitter(apply(test.sr.b.gibbs.value, 1, mean)))
+
+```
+
+

@@ -1,4 +1,6 @@
 \name{CIDnetworks-classes}
+\alias{BETA}
+\alias{BETAcid}
 \alias{COV}
 \alias{COVcid}
 \alias{HBM}
@@ -20,6 +22,7 @@
 }
 \usage{
 
+  BETA(...)
   COV (...)
   HBM (...)
   LSM (...)
@@ -39,6 +42,8 @@
   CIDnetwork class object. Information on the nodes, edge list, and so
   forth will be passed automatically by any routine creating a CID
   object. Options are generally provided by default. Arguments for each class:
+
+  BETA: required: (nothing). Parameters: intercept.sr.
   
   COV: required: covariates (matrix). Parameters: Corresponding coefficient vector coef.cov.
 

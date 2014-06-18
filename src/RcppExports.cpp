@@ -5,6 +5,21 @@
 
 using namespace Rcpp;
 
+// makeArcList
+IntegerMatrix makeArcList(int nn);
+RcppExport SEXP CIDnetworks_makeArcList(SEXP nnSEXP) {
+BEGIN_RCPP
+    SEXP __sexp_result;
+    {
+        Rcpp::RNGScope __rngScope;
+        Rcpp::traits::input_parameter< int >::type nn(nnSEXP );
+        IntegerMatrix __result = makeArcList(nn);
+        PROTECT(__sexp_result = Rcpp::wrap(__result));
+    }
+    UNPROTECT(1);
+    return __sexp_result;
+END_RCPP
+}
 // makeEdgeList
 IntegerMatrix makeEdgeList(int nn);
 RcppExport SEXP CIDnetworks_makeEdgeList(SEXP nnSEXP) {

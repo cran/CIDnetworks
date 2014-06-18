@@ -61,7 +61,7 @@ HBMcid <-
       outcome="numeric",
       edge.list="matrix",
       residual.variance="numeric",
-      sr.rows="list"    #,
+      edge.list.rows="list"    #,
       ),
     
     methods=list(
@@ -72,7 +72,7 @@ HBMcid <-
         
         n.nodes=10,
         edge.list=make.edge.list(n.nodes),
-        sr.rows=row.list.maker(edge.list),
+        edge.list.rows=row.list.maker(edge.list),
         residual.variance=1,
         outcome=numeric(0),
        
@@ -95,7 +95,7 @@ HBMcid <-
         
         .self$n.nodes <<- n.nodes
         .self$edge.list <<- edge.list
-        .self$sr.rows <<- sr.rows
+        .self$edge.list.rows <<- edge.list.rows
         .self$node.names <<- as.character(1:.self$n.nodes)
         
         .self$n.groups <<- n.groups
@@ -132,7 +132,7 @@ HBMcid <-
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
-          sr.rows <<- row.list.maker(edge.list)
+          edge.list.rows <<- row.list.maker(edge.list)
         }
 
         
@@ -173,7 +173,7 @@ HBMcid <-
         circular.dendrogram (memb, tree.par, blockval, node.labels=node.names)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, node.labels=node.names, ...)
+        image.netplot (edge.list, color, node.labels=node.names, ...)
       },
 
       
@@ -229,17 +229,17 @@ HBMcid <-
  
           log.pp.vec <- sapply(1:n.groups, function(gg) {
             b.memb[ii] <- gg
-            piece <- block.value[common.anc.temp[b.memb[edge.list[sr.rows[[ii]],1]] +
-                                                 n.groups*(b.memb[edge.list[sr.rows[[ii]],2]]-1)]]
+            piece <- block.value[common.anc.temp[b.memb[edge.list[edge.list.rows[[ii]],1]] +
+                                                 n.groups*(b.memb[edge.list[edge.list.rows[[ii]],2]]-1)]]
             
-            sum(dnorm(outcome[sr.rows[[ii]]], piece, sqrt(residual.variance), log=TRUE))
+            sum(dnorm(outcome[edge.list.rows[[ii]]], piece, sqrt(residual.variance), log=TRUE))
           })
           log.pp.vec <- log.pp.vec - max(log.pp.vec)
           b.memb[ii] <- sample (1:n.groups, 1, prob=exp(log.pp.vec))
         } else if (sum(b.memb != b.memb[ii]) > 0) { #if it would cause a problem, and it's an option, find a leaf on another internal node and propose a swap.
           other.node <- sample((1:n.nodes)[b.memb != b.memb[ii]], 1)
           b.memb.temp <- b.memb; b.memb.temp[ii] <- b.memb[other.node]; b.memb.temp[other.node] <- b.memb[ii]
-          rowset <- intersect(sr.rows[[ii]], sr.rows[[other.node]])
+          rowset <- intersect(edge.list.rows[[ii]], edge.list.rows[[other.node]])
 
           piece0 <- block.value[common.anc.temp[b.memb[edge.list[rowset,1]] +
                                                 n.groups*(b.memb[edge.list[rowset,2]]-1)]]

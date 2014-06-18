@@ -1,0 +1,33 @@
+CIDnetworks test: Prison data of Gagnon/MacRae
+========================================================
+
+```{r}
+library(CIDnetworks)
+data(prison)
+
+cid.prison <- CID (sociomatrix=prison, is.directed=TRUE)
+
+
+
+prison.back <- cid.prison
+cid.prison$generate()
+cid.prison$outcome
+cid.prison$show()
+
+cid.prison$plot.network()
+
+cpg <- CID.Gibbs (sociomatrix=prison, burnin=1, thin=1)
+
+cpg <- CID.Gibbs (sociomatrix=prison, components=list(SBM(3)))
+summary(cpg)
+plot(cpg)
+
+cpg2 <- CID.Gibbs (sociomatrix=prison, components=list(SBM(3, symmetric=FALSE)))
+plot(cpg2)
+sociogram.plot(cpg2)
+
+cpg <- CID.Gibbs (sociomatrix=prison, components=list(LSM(2)))
+plot(cpg)
+
+
+```

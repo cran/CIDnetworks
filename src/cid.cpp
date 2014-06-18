@@ -4,6 +4,16 @@
 using namespace Rcpp;
 
 // [[Rcpp::export]]
+IntegerMatrix makeArcList (int nn) {
+  int rows = nn*(nn-1);
+  IntegerMatrix out(rows,2);
+  int ii,jj,cc;
+  cc=0;
+  for (ii=1; ii<nn+1; ++ii) for (jj=1; jj<nn+1; ++jj) if (ii != jj) {out(cc,0)=ii; out(cc,1)=jj; ++cc;}
+  return(out);
+}
+
+// [[Rcpp::export]]
 IntegerMatrix makeEdgeList (int nn) {
   int rows = nn*(nn-1)/2;
   IntegerMatrix out(rows,2);

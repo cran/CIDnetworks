@@ -1,5 +1,5 @@
 
-#library(Rcpp); library(mvtnorm); library(msm); sourceCpp ("../src/cid.cpp"); source("CID-basefunctions.R"); 
+#library(Rcpp); library(mvtnorm); library(msm); sourceCpp ("../src/cid.cpp"); source("CID-basefunctions.R");
 
 # Single-membership Stochastic Block Model: Reference Class
 
@@ -24,34 +24,34 @@ MMSBMcid <-
       membership.edge="matrix",   #looks like edge list: has the membership number of each participant.
       membership.node="matrix",   #each column is the Dirichlet distribution for each membership.
       membership.alpha0="numeric",  #prior strength for the Dirichlet -- alpha0*vector(1)
-      
+
       shift="numeric",
       restrict.and.shift="logical",
       group.pairs="matrix",
 
       #single.membership="logical",
-      
+
       #inherited from main. Must fix later, but OK for now.
       node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
       residual.variance="numeric",
-      sr.rows="list"    #,
+      edge.list.rows="list"    #,
       ),
-    
+
     methods=list(
-      
+
       initialize = function (
 
         n.groups=2,
-        
+
         n.nodes=10,
         edge.list=make.edge.list(n.nodes),
-        sr.rows=row.list.maker(edge.list),
+        edge.list.rows=row.list.maker(edge.list),
         residual.variance=1,
         outcome=numeric(0),
-       
+
         b.vector=rep(0, n.groups*(n.groups+1)/2),
         b.vector.m=rep(0, n.groups*(n.groups+1)/2),
         b.vector.v=rep(10000, n.groups*(n.groups+1)/2),
@@ -59,22 +59,22 @@ MMSBMcid <-
         membership.alpha0=0.1,
         membership.node=rdirichlet.block (matrix(membership.alpha0, nrow=n.groups, ncol=n.nodes)),
         membership.edge=draw.MMSB.from.nodes(edge.list, membership.node),
-        
+
         shift=0,
         #single.membership=FALSE,
-        
+
         restrict.and.shift=FALSE,
         generate=FALSE
-        
+
         ) {
-        
+
         .self$n.nodes <<- n.nodes
         .self$edge.list <<- edge.list
-        .self$sr.rows <<- sr.rows
+        .self$edge.list.rows <<- edge.list.rows
         .self$node.names <<- as.character(1:.self$n.nodes)
-        
+
         .self$n.groups <<- n.groups
-        
+
         .self$b.vector <<- b.vector
         .self$b.vector.m <<- b.vector.m
         .self$b.vector.v <<- b.vector.v
@@ -87,36 +87,36 @@ MMSBMcid <-
         #.self$single.membership <<- FALSE
 
         .self$group.pairs <<- makeEdgeListSelfies(n.groups)
-                
+
         .self$shift <<- shift
         if (generate) .self$generate() else .self$outcome <<- outcome
         rotate()
       },
-      
+
       center.me = function () if (restrict.and.shift) {
         shift <<- mean(b.vector)
         b.vector <<- b.vector - shift
       },
-       
+
       reinitialize = function (n.nodes=NULL,
         edge.list=NULL, node.names=NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
-          sr.rows <<- row.list.maker(edge.list)
+          edge.list.rows <<- row.list.maker(edge.list)
         }
 
         if (n.groups > n.nodes) {
           warning ("MMSBM: Resetting number of groups to one less than the number of nodes.")
           n.groups <<- n.nodes - 1
           b.vector <<- rep(0, n.groups*(n.groups+1)/2)
-          
+
           membership.node <<- sample(n.groups, n.nodes, replace=TRUE)
           membership.edge <<- draw.MMSB.from.nodes(edge.list, membership.node)
           membership.alpha0 <<- membership.alpha0[1:n.groups]
         }
-        
-        
+
+
         if (ncol(membership.node) != n.nodes) {
           message ("Reinitializing MMSBM Membership Fractions")
           membership.node <<- rdirichlet.block (matrix(membership.alpha0, nrow=n.groups, ncol=n.nodes))
@@ -151,9 +151,9 @@ MMSBMcid <-
         block.membership.plot (memb, block, node.labels=node.names, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, node.labels=node.names, ...)
+        image.netplot (edge.list, color, node.labels=node.names, ...)
       },
-      
+
 
 
       value = function () {
@@ -170,7 +170,7 @@ MMSBMcid <-
       },
 
 
-      
+
       generate = function () {outcome <<- rnorm(nrow(edge.list), value(), sqrt(residual.variance))},
 
       log.likelihood = function(parameters=pieces(), edges=1:nrow(edge.list)) {
@@ -183,14 +183,14 @@ MMSBMcid <-
 
         membership.node <<-
           rdirichlet.block (matrix(membership.alpha0, nrow=n.groups, ncol=n.nodes))
-        
+
         membership.edge <<- draw.MMSB.from.nodes(edge.list, membership.node)
-        
+
         b.vector <<- rnorm(n.groups*(n.groups+1)/2, 0, 0.5)
 #        rotate()
-        
+
       },
-      
+
 
       rotate = function () {
         rotation <- MMSBM.ID.rotation(membership.node, n.groups)
@@ -198,7 +198,7 @@ MMSBMcid <-
         membership.node <<- membership.node[rotation,]
         b.vector <<- SBM.rotate.bvector(b.vector, rotation)
       },
-      
+
       draw = function (verbose=0, as.if.single=FALSE) {
 
         if (length(outcome) != nrow(edge.list)) stop ("MMSBM: outcome and edge.list have different lengths.")
@@ -209,11 +209,11 @@ MMSBMcid <-
         b.node <- membership.node
         #if (verbose>1) print(b.memb)
 
-        
+
         # draw edge and node memberships. We can do them simultaneously for each node.
         for (ii in sample(1:n.nodes)) {
-          lefty <- sr.rows[[ii]][which(edge.list[sr.rows[[ii]],1] == ii)]
-          righty <- sr.rows[[ii]][which(edge.list[sr.rows[[ii]],2] == ii)]
+          lefty <- edge.list.rows[[ii]][which(edge.list[edge.list.rows[[ii]],1] == ii)]
+          righty <- edge.list.rows[[ii]][which(edge.list[edge.list.rows[[ii]],2] == ii)]
           log.pp.mat <- t(sapply(1:n.groups, function(gg) {
             b.block[lefty, 1] <- gg
             b.block[righty, 2] <- gg
@@ -230,32 +230,32 @@ MMSBMcid <-
             })
             if (length(lefty)>0) b.block[lefty,1] <- picks[1:length(lefty)]
             if (length(righty)>0) b.block[righty,2] <- picks[length(lefty) + 1:length(righty)]
-          
+
           #node membership
             counts <- sapply(1:n.groups, function(gg)
                              sum(membership.edge[,1]==gg & edge.list[,1]==ii) +
                              sum(membership.edge[,2]==gg & edge.list[,2]==ii))
 
             b.node[,ii] <- rdirichlet.one (counts + membership.alpha0)
-            
+
           } else {
             #print("AIS")
-            
+
             #assuming even prior odds on each group, but all memberships for a node are the same.
             cc <- apply(log.pp.mat, 1, sum); cc <- cc - max(cc)
             pick <- sample(1:n.groups, 1, prob=exp(cc))
             if (length(lefty)>0) b.block[lefty,1] <- pick
             if (length(righty)>0) b.block[righty,2] <- pick
             b.node[,ii] <- 1/n.groups
-            
+
           }
-            
+
         }
-        
+
 #        if (verbose>1) print(b.memb)
         membership.edge <<- b.block
         membership.node <<- b.node
-       
+
         b.vector <<- sapply(1:length(b.vector), function(bb) {
           picks <- unique(c(which(membership.edge[,1]==group.pairs[bb,1] &
                                   membership.edge[,2]==group.pairs[bb,2]),
@@ -272,14 +272,14 @@ MMSBMcid <-
 
         if (restrict.and.shift) {center.me()}
 #        rotate()
-        
+
       },
 
       gibbs.full = function (report.interval=0, draws=100, burnin=0, thin=1,
         make.random.start=FALSE,
         as.if.single=FALSE) {
         out <- list()
-        
+
         if (make.random.start) random.start()
         for (kk in 1:(draws*thin+burnin)) {
           draw(as.if.single=as.if.single);
@@ -293,7 +293,7 @@ MMSBMcid <-
         }
         return(out)
       },
-      
+
       gibbs.value = function (gibbs.out) sapply(gibbs.out, function(gg) {
         value.ext (gg)
       }),
@@ -301,21 +301,20 @@ MMSBMcid <-
       gibbs.summary = function (gibbs.out) {
         membs <- matrix(apply(sapply(gibbs.out, function(gg) gg$membership.node), 1, mean), ncol=n.nodes)
         colnames(membs) <- node.names
-        
+
         bvec <- apply(sapply(gibbs.out, function(gg) gg$b.vector), 1, mean)
         return(list(membership.node=membs,
                     b.vector=bvec,
                     block=symBlock(bvec)))
       },
-      print.gibbs.summary = function (gibbs.out) {
-        get.sum <- gibbs.summary(gibbs.out)
+      print.gibbs.summary = function (gibbs.sum) {
         message ("Block membership mixes:")
-        print (get.sum$membership.node)
+        print (gibbs.sum$membership.node)
 
         message ("Block value matrix:")
-        print (get.sum$block)
-        
-        return(invisible(get.sum))
+        print (gibbs.sum$block)
+
+        return()
       },
 
       gibbs.plot = function (gibbs.out, ...) {

@@ -1,0 +1,43 @@
+CIDnetworks test: Generative examples
+========================================================
+
+```{r}
+library(CIDnetworks)
+
+cid.one <- CID (n.nodes=50, components=list(SBM(3)), generate=TRUE)
+
+print.CIDnetwork <- function (x) x$show()
+
+
+
+cid.one <- CID (n.nodes=50, 
+                intercept=-2, 
+                components=list(SBM(3, block.matrix=matrix(c(3,0,0,0,3,0,0,0,3), nrow=3), membership=as.integer(c(rep(1,15), rep(2,15), rep(3,20))))),
+                generate=TRUE)
+cid.one$plot.network()
+
+cid.two <- CID (n.nodes=50, 
+                intercept=-1.5, 
+                components=list(SBM(3, block.matrix=matrix(c(2,0,0,0,2,0,0,0,2), nrow=3), membership=as.integer(c(rep(1,15), rep(2,15), rep(3,20))))),
+                is.directed=TRUE,
+                generate=TRUE)
+cid.two
+cid.two$plot.network()
+
+
+cid.three <- CID (n.nodes=50, 
+                intercept=1.5, 
+                components=list(
+                  SBM(3, block.matrix=matrix(c(2,0,0,0,2,0,0,0,2), nrow=3), membership=as.integer(c(rep(1,15), rep(2,15), rep(3,20)))),
+                  LSM(2, latent.space.pos=matrix(rnorm(2*50, 0, 3), nrow=50))
+                  ),
+                is.directed=TRUE,
+                generate=TRUE)
+cid.three
+cid.three$plot.network()
+```
+
+
+
+
+

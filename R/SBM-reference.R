@@ -1,5 +1,5 @@
 
-#library(Rcpp); library(mvtnorm); library(msm); sourceCpp ("../src/cid.cpp"); source("CID-basefunctions.R"); 
+#library(Rcpp); library(mvtnorm); library(msm); sourceCpp ("../src/cid.cpp"); source("CID-basefunctions.R");
 
 # Single-membership Stochastic Block Model: Reference Class
 
@@ -11,167 +11,171 @@ SBMcid <-
     "SBMcid",
     fields = list(
       n.groups="numeric",
-      b.vector="numeric",
 
-      b.vector.m="numeric",
-      b.vector.v="numeric",
-      
-      
+      block.matrix="matrix",
+
+      block.matrix.m="matrix",
+      block.matrix.v="matrix",
+
       membership="integer",
-      #mult.factor="numeric",
-      #mult.factor.m="numeric",
-      #mult.factor.v="numeric",
       membership.a="matrix",
 
-      shift="numeric",
-      restrict.and.shift="logical",
+      symmetric.b="logical",
+      #same.sr.membership="logical",
+
+      ##shift="numeric",
+      ##restrict.and.shift="logical",
+
       group.pairs="matrix",
-      
+
       #inherited from main. Must fix later, but OK for now.
       node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
       residual.variance="numeric",
-      sr.rows="list"    #,
+      edge.list.rows="list"    #,
       ),
-    
+
     methods=list(
-      
+
       initialize = function (
 
         n.groups=1,
-        
+
         n.nodes=10,
         edge.list=make.edge.list(n.nodes),
-        sr.rows=row.list.maker(edge.list),
+        edge.list.rows=row.list.maker(edge.list),
         residual.variance=1,
         outcome=numeric(0),
-       
-        b.vector=rep(0, n.groups*(n.groups+1)/2),
-        b.vector.m=rep(0, n.groups*(n.groups+1)/2),
-        b.vector.v=rep(10000, n.groups*(n.groups+1)/2),
-        
+
+        block.matrix=matrix(0, nrow=n.groups, ncol=n.groups),
+        block.matrix.m=matrix(0, nrow=n.groups, ncol=n.groups),
+        block.matrix.v=matrix(10000, nrow=n.groups, ncol=n.groups),
+
+        ##b.vector.m=rep(0, n.groups*(n.groups+1)/2),
+        ##b.vector.v=rep(10000, n.groups*(n.groups+1)/2),
+
         membership=sample(n.groups, n.nodes, replace=TRUE),
-        
-        #mult.factor=1,
-        #mult.factor.m=0,
-        #mult.factor.v=1000000,
+        symmetric.b=TRUE,
 
         membership.a=matrix(1, nrow=n.nodes, ncol=n.groups),
-        shift=0,
 
-        restrict.and.shift=FALSE,
         generate=FALSE
-        
+
         ) {
-        
+
         .self$n.nodes <<- n.nodes
         .self$edge.list <<- edge.list
-        .self$sr.rows <<- sr.rows
+        .self$edge.list.rows <<- edge.list.rows
         .self$node.names <<- as.character(1:.self$n.nodes)
-        
-        .self$n.groups <<- n.groups
-        
-        .self$b.vector <<- b.vector
-        .self$b.vector.m <<- b.vector.m
-        .self$b.vector.v <<- b.vector.v
-        .self$membership <<- membership
 
-        #.self$mult.factor <<- mult.factor
-        #.self$mult.factor.m <<- mult.factor.m
-        #.self$mult.factor.v <<- mult.factor.v
+        .self$n.groups <<- n.groups
+
+        .self$block.matrix <<- block.matrix
+        .self$block.matrix.m <<- block.matrix.m
+        .self$block.matrix.v <<- block.matrix.v
+        .self$membership <<- as.integer(membership)
 
         .self$membership.a <<- membership.a
         .self$residual.variance <<- residual.variance
-        .self$restrict.and.shift <<- restrict.and.shift
 
         .self$group.pairs <<- makeEdgeListSelfies(n.groups)
-                
-        .self$shift <<- shift
+
+        .self$symmetric.b <<- symmetric.b
+
+        if (symmetric.b) {
+          b.block <- .self$block.matrix
+          b.block[u.diag(.self$n.groups)] <- b.block[l.diag(.self$n.groups)]
+          .self$block.matrix <<- as.matrix(b.block)
+        }
+
         if (generate) .self$generate() else .self$outcome <<- outcome
+
 
         #center.me()
       },
-      center.me = function () if (restrict.and.shift) {
 
-        shift <<- mean(b.vector)
-        b.vector <<- b.vector - shift
-        
+      #center.me = function () if (restrict.and.shift) {
+
+      #  shift <<- mean(b.vector)
+      #  b.vector <<- b.vector - shift
+
         #if (n.groups > 1) {
         #  sdbv <- sd(b.vector)
         #  b.vector <<- b.vector/sdbv
         #  mult.factor <<- mult.factor*sdbv
         #}
-        
+
         #intercept <<- intercept + shift.t
-      },
-       
+      #},
+
       reinitialize = function (n.nodes=NULL,
+
         edge.list=NULL, node.names=NULL) {
+
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
-          sr.rows <<- row.list.maker(edge.list)
+          edge.list.rows <<- row.list.maker(edge.list)
         }
+        if (!is.null(node.names)) {
+          if (length(node.names) == .self$n.nodes) node.names <<- node.names
+        } else node.names <<- as.character(1:.self$n.nodes)
+
 
         if (n.groups > n.nodes) {
           warning ("SBM: Resetting number of groups to one less than the number of nodes.")
           n.groups <<- n.nodes - 1
-          b.vector <<- rep(0, n.groups*(n.groups+1)/2)
-          
+          block.matrix <<- matrix(0, nrow=n.groups,ncol=n.groups)
+
           membership <<- sample(n.groups, n.nodes, replace=TRUE)
           membership.a <<- matrix(1, nrow=n.nodes, ncol=n.groups)
         }
-        
+
         if (length(membership) != n.nodes) {
           message ("Reinitializing SBM Memberships")
           membership <<- sample(n.groups, n.nodes, replace=TRUE)
           membership.a <<- matrix(1, nrow=n.nodes, ncol=n.groups)
         }
-        
-        if (!is.null(node.names)) {
-          if (length(node.names) == .self$n.nodes) node.names <<- node.names
-        } else node.names <<- as.character(1:.self$n.nodes)
-        
+
       },
 
-      pieces = function (include.name=FALSE) {
-        out <- list (b.vector=b.vector, membership=membership)#, mult.factor=mult.factor)
+      pieces = function (include.name=TRUE) {
+        out <- list (block.matrix=block.matrix, membership=membership)#, mult.factor=mult.factor)
         class(out) <- "SBMout"
-        #if (include.name) out <- c("SBM", out)
         out
       },
 
       show = function () {
-        message("b.vector:"); print(b.vector)
+        message("block.matrix:"); print(block.matrix)
         message("membership:"); print(membership)
         #message("mult.factor:"); print(mult.factor)
       },
-      plot = function (memb=membership, block=symBlock(b.vector), ...) {
+      plot = function (memb=membership, block=block.matrix, ...) {
         single.membership.plot (memb, block, node.labels=node.names, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, node.labels=node.names, ...)
+        image.netplot (edge.list, color, node.labels=node.names, ...)
       },
 
 
 
       value = function () {
-        sbm.matrix <- symBlock(b.vector)
+        #sbm.matrix <- symBlock(b.vector)
         #mult.factor*
-          sbm.matrix[membership[edge.list[,1]] +
-                     dim(sbm.matrix)[1]*(membership[edge.list[,2]]-1)]
+          block.matrix[membership[edge.list[,1]] +
+                       dim(block.matrix)[1]*(membership[edge.list[,2]]-1)]
       },
       value.ext = function (parameters=pieces(), edges=1:nrow(edge.list)) {   #slightly slower.
-        sbm.matrix <- symBlock(parameters[[1]])
+        sbm.matrix <- parameters[[1]]
         #parameters[[3]]*
         sbm.matrix[parameters[[2]][edge.list[edges,1]] +
                    dim(sbm.matrix)[1]*(parameters[[2]][edge.list[edges,2]]-1)]
       },
 
 
-      
+
       generate = function () {outcome <<- rnorm(nrow(edge.list), value(), sqrt(residual.variance))},
 
       log.likelihood = function(parameters=pieces(), edges=1:nrow(edge.list)) {
@@ -182,17 +186,18 @@ SBMcid <-
 
       random.start = function () {
         membership <<- sample(n.groups, n.nodes, replace=TRUE)
-        b.vector <<- rnorm(n.groups*(n.groups+1)/2, 0, 0.5)
+        block.matrix <<- matrix(rnorm(n.groups*n.groups, 0, 1), nrow=n.groups)
+        #b.vector <<- rnorm(n.groups*(n.groups+1)/2, 0, 0.5)
         #if (restrict.and.shift) mult.factor <<- rnorm(1, mult.factor.m, sqrt(mult.factor.v))
       },
-      
+
      # draw.mult.factor = function () {
 
      #   b.matrix <- symBlock(b.vector)
      #   X.term <- b.matrix[membership[edge.list[,1]] + (membership[edge.list[,2]]-1)*n.groups]
-        
+
         #if (verbose>1) {print(X.term); print(outcome)}
-          
+
      #   var.comp <- 1/(sum(X.term^2)/residual.variance + 1/mult.factor.v)
      #   mean.comp <- var.comp*(sum(X.term*outcome)/residual.variance + mult.factor.m/mult.factor.v)
      #   mult.factor <<- rnorm (1, mean.comp, sqrt(var.comp))
@@ -202,26 +207,26 @@ SBMcid <-
       rotate = function () {
         rotation <- SBM.ID.rotation(membership, n.groups)
         membership <<- rotation[membership]
-        b.vector <<- SBM.rotate.bvector(b.vector, rotation)
+        block.matrix <<- SBM.rotate.block(block.matrix, rotation)
       },
-      
+
       draw = function (verbose=0) {
 
         if (length(outcome) != nrow(edge.list)) stop ("SBM: outcome and edge.list have different lengths.")
 
-        b.matrix <- symBlock(b.vector)
+        #b.matrix <- block.matrix
         b.memb <- membership
         #b.factor <- mult.factor
-        
+
         if (verbose>1) print(b.memb)
 
         # draw memberships.
         for (ii in sample(1:n.nodes)) {
           log.pp.vec <- sapply(1:n.groups, function(gg) {
             b.memb[ii] <- gg
-            piece <- b.matrix[b.memb[edge.list[sr.rows[[ii]],1]] +
-                              (b.memb[edge.list[sr.rows[[ii]],2]]-1)*n.groups]
-            sum(dnorm(outcome[sr.rows[[ii]]], piece, sqrt(residual.variance), log=TRUE)) +
+            piece <- block.matrix[b.memb[edge.list[edge.list.rows[[ii]],1]] +
+                                  (b.memb[edge.list[edge.list.rows[[ii]],2]]-1)*n.groups]
+            sum(dnorm(outcome[edge.list.rows[[ii]]], piece, sqrt(residual.variance), log=TRUE)) +
               log(membership.a[ii,gg])
           })
           log.pp.vec <- log.pp.vec - max(log.pp.vec)
@@ -230,35 +235,33 @@ SBMcid <-
         if (verbose>1) print(b.memb)
         membership <<- b.memb
 
-        
+
 
         #draw block probs.
         #bits <- makeEdgeListSelfies(n.groups)
         membership.pairs <- cbind(b.memb[edge.list[,1]],
                                   b.memb[edge.list[,2]])
-        
-        b.vector <<- sapply(1:length(b.vector), function(bb) {
-          picks <- unique(c(which(membership.pairs[,1]==group.pairs[bb,1] &
-                                  membership.pairs[,2]==group.pairs[bb,2]),
-                            which(membership.pairs[,1]==group.pairs[bb,2] &
-                                  membership.pairs[,2]==group.pairs[bb,1])))
-          if (length(picks) > 0) {
-            var.b <- 1/(length(picks)/residual.variance + 1/b.vector.v[bb])
-            mean.b <- var.b*(sum(outcome[picks])/residual.variance + b.vector.m[bb]/b.vector.v[bb])
-            output <- rnorm(1, mean.b, sqrt(var.b))
-          } else output <- rnorm(1, 0, 0.5)
-          output
-        })
+        for (ss in 1:n.groups)
+          for (rr in 1:n.groups) if (!symmetric.b | (symmetric.b & ss <= rr)) {
+            if (symmetric.b) {
+              picks <- which((b.memb[edge.list[,1]] == ss & b.memb[edge.list[,2]] == rr) |
+                             (b.memb[edge.list[,2]] == ss & b.memb[edge.list[,1]] == rr))
+            } else {
+              picks <- which(b.memb[edge.list[,1]] == ss & b.memb[edge.list[,2]] == rr)
+            }
 
+            if (length(picks) > 0) {
+              var.b <- 1/(length(picks)/residual.variance + 1/block.matrix.v[ss,rr])
+              mean.b <- var.b*(sum(outcome[picks])/residual.variance + block.matrix.m[ss,rr]/block.matrix.v[ss,rr])
+              output <- rnorm(1, mean.b, sqrt(var.b))
+            } else output <- rnorm(1, 0, 0.5)
 
-        if (restrict.and.shift) {
-          #message("Exterminate")
-          center.me()
-          #draw.mult.factor()
-        }
+            block.matrix[ss,rr] <<- output
+            if (symmetric.b) block.matrix[rr,ss] <<- output
+          }
 
         rotate()
-        
+
       },
 
       gibbs.full = function (report.interval=0, draws=100, burnin=0, thin=1, make.random.start=FALSE) {
@@ -274,45 +277,44 @@ SBMcid <-
         }
         return(out)
       },
-      
+
       gibbs.value = function (gibbs.out) sapply(gibbs.out, function(gg) {
         value.ext (gg)
       }),
 
       gibbs.summary = function (gibbs.out) {
         membs1 <- {
-          d1 <- sapply(gibbs.out, function(gg) number.to.vector(gg$membership))
+          d1 <- sapply(gibbs.out, function(gg) number.to.vector(gg$membership, nrow(gg$block.matrix)))
           matrix(apply(d1, 1, mean),  ncol=n.nodes)
         }
         colnames(membs1) <- node.names
-        bvec <- apply(sapply(gibbs.out, function(gg) gg$b.vector), 1, mean)
+        this.block.matrix <- matrix(apply(sapply(gibbs.out, function(gg) c(gg$block.matrix)), 1, mean),
+                               nrow=n.groups)
         modal.membership <- apply(membs1, 2, which.max)
         return(list(membership=membs1,
                     modal.membership=modal.membership,
-                    b.vector=bvec,
-                    block=symBlock(bvec)))
+                    block.matrix=this.block.matrix))
       },
-      print.gibbs.summary = function (gibbs.out) {
-        get.sum <- gibbs.summary(gibbs.out)
+      print.gibbs.summary = function (gibbs.sum) {
         message ("Probabilistic block memberships:")
-        print (get.sum$membership)
+        print (gibbs.sum$membership)
 
         message ("Modal block memberships:")
-        print (get.sum$modal.membership)
+        print (gibbs.sum$modal.membership)
 
         message ("Block value matrix:")
-        print (get.sum$block)
-        
-        return(invisible(get.sum))
+        print (gibbs.sum$block.matrix)
+
+        return()
       },
 
       gibbs.node.order = function (gibbs.out) {
         get.sum <- gibbs.summary(gibbs.out)
       },
-      
+
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
-        block.membership.plot (get.sum$membership, get.sum$block, node.labels=node.names,
+        block.membership.plot (get.sum$membership, get.sum$block.matrix, node.labels=node.names,
                                main = "SBM Summary from Gibbs Sampler", ...)
       },
 
@@ -321,7 +323,7 @@ SBMcid <-
         return(colors[get.sum$modal.membership])
       }
 
-      
+
 
 
       )

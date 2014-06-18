@@ -1,45 +1,47 @@
 
 
 # Nodal Intercept Network Model: Reference Class.
+# Note: This is now directional. The undirected case is now BETA().
 
-SRcid <-
+BETAcid <-
   setRefClass(
-    "SRcid",
+    "BETAcid",
     fields = list(
+      
+      intercept.sr="matrix",
       intercept.sr.var="numeric",
-      intercept.sr="numeric",
       intercept.sr.var.ab="numeric",
-
+      
       node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
       residual.variance="numeric",
-      sr.rows="list"    #,
+      edge.list.rows="list"    #,
       ),
     
     methods = list(
       initialize = function (
-
+        
         intercept.sr.var=1,
         
         n.nodes=10,
         edge.list=make.edge.list(n.nodes),
-        sr.rows=row.list.maker(edge.list),
+        edge.list.rows=row.list.maker(edge.list),
         residual.variance=1,
         outcome=numeric(0),
         
         intercept.sr.var.ab=c(0.001, 0.001),
         
-        intercept.sr=rnorm(n.nodes, 0, sqrt(intercept.sr.var)),
-
+        intercept.sr=cbind(rnorm(n.nodes, 0, sqrt(intercept.sr.var))),
+        
         generate=FALSE
         
         ) {
-       
+        
         .self$n.nodes <<- n.nodes
         .self$edge.list <<- edge.list
-        .self$sr.rows <<- sr.rows
+        .self$edge.list.rows <<- edge.list.rows
         .self$residual.variance <<- residual.variance
         .self$node.names <<- as.character(1:.self$n.nodes)
         
@@ -56,11 +58,11 @@ SRcid <-
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
-          sr.rows <<- row.list.maker(edge.list)
+          edge.list.rows <<- row.list.maker(edge.list)
         }
         if (length(intercept.sr) != n.nodes) {
-          message ("Reinitializing SR Intercepts")
-          intercept.sr <<- rnorm(n.nodes, 0, sqrt(intercept.sr.var))
+          message ("Reinitializing BETA Intercepts")
+          intercept.sr <<- cbind(rnorm(n.nodes, 0, sqrt(intercept.sr.var)))
         }
         if (!is.null(node.names)) {
           if (length(node.names) == .self$n.nodes) node.names <<- node.names
@@ -69,7 +71,7 @@ SRcid <-
 
       pieces = function (include.name=FALSE) {
         out <- list(intercept.sr=intercept.sr, intercept.sr.var=intercept.sr.var)
-        class(out) <- "SRout"
+        class(out) <- "BETAout"
         #if (include.name) out <- c("SR", out)
         out
       },
@@ -82,7 +84,7 @@ SRcid <-
         dotchart.coef (coefs, names, sd, interval, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, node.labels=node.names, ...)
+        image.netplot (edge.list, color, node.labels=node.names, ...)
       },
 
       
@@ -104,7 +106,7 @@ SRcid <-
       
       random.start = function () {
         intercept.sr.var <<- rgamma(1, 1) #1/rgamma(1, intercept.sr.var.ab[1], intercept.sr.var.ab[1])
-        intercept.sr <<- rnorm (n.nodes, 0, sqrt(intercept.sr.var))
+        intercept.sr <<- cbind(rnorm (n.nodes, 0, sqrt(intercept.sr.var)))
         names(intercept.sr) <<- node.names
       },
       
@@ -116,7 +118,7 @@ SRcid <-
         varblock <- solve(intercept.block/residual.variance + diag(1/intercept.sr.var, n.nodes))
         meanblock <- varblock%*%(intercept.outcome/residual.variance + 0)   #mean zero.
         
-        intercept.sr <<- c(rmvnorm(1, meanblock, varblock))
+        intercept.sr <<- cbind(c(rmvnorm(1, meanblock, varblock)))
         names(intercept.sr) <<- node.names
         
         intercept.sr.var <<-
@@ -163,7 +165,7 @@ SRcid <-
       
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
-        plot (get.sum[,1], interval = get.sum[,3:4], main = "SR-Intercept Summary from Gibbs Sampler", ...)
+        plot (get.sum[,1], interval = get.sum[,3:4], main = "BETA-Intercept Summary from Gibbs Sampler", ...)
       },
 
       gibbs.node.colors = function (gibbs.out) {

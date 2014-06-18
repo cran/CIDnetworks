@@ -1,6 +1,7 @@
 Things to add:
 
--names
+
+-names for each node in each mode. We need a guide for this! (Note: AT doesn't remember what he meant by "guide")
 
 -Permutation of networks for better display (block models, etc.)
 
@@ -12,7 +13,6 @@ Things to add:
 
 -more data sets!
 
--integration of simple network plots (stick-and-ball style).
 
 
 
@@ -22,3 +22,81 @@ Bigger projects:
 1) Directed graphs.
 
 2) Multiple network indicators/tests.
+
+
+Sam's List:
+
+CREATE A CHECK: In the current code, integers (including negative integers) are treated as ordinal variables and Gaussian otherwise. We need explicit checking for negative values (integers in particular) in outcome data, to treat it either as a Gaussian variable or print out an error message.
+
+robit.augment is there but not used; currently doesn't do anything
+
+Simulate Network: Function to simulate network with number of nodes and a given model
+
+CID.generate should be able to take in outside value; add an option so that it does not overwrite on the provided data (COPY the outcome of CID.generate)
+
+vary cutoffs with the size of the outcome for different edges? (currently all edges have same cutoffs for ordinal cutoff)
+
+needs legend for the color scale in plot.network for each sub component class
+
+figure out  whether draws execute LSM with intercept?  (how 'shift' works for LSM)
+
+Centering of latent positions (do we really need this?)
+
+fix is.directed= FALSE option in CID function
+
+use CID.generate for using the parameters for posterior predictive checking
+have generate = TRUE for generating data
+
+for SBM change the membership in the wrapper function (?) to have as.integer for membership vector
+
+write wrapper functions for standard user functions like show and plot for CID object 
+	-Sam will do this.
+
+generation of LSM positions with model hyperparameters 
+
+round the estimated remaining time to nearest minute or hours....
+
+
+
+Beau's List:
+
+1) Add draws, burnin, etc. to arguments in CID.Gibbs. ## default: draws = 100, burnin -1, thinin = 10 # Done!
+
+2) Call CID.Gibbs on a CID.Object, while changing the components. ##fixed: using reinitialize and updating components of CID.object
+
+3) Call on CID.Gibbs object to extend the chain. ##Almost done. Need to add drop = TRUE argument.  How do we handle differing burnin/thin values?  Default to burnin 0 and same thin value?  Default thin to 1?
+
+4) Discard all -Inf burn-ins, regardless.
+4a) Identify what's contributing to the -Inf. Is it pnorm(Z)? If so, why so bad? Also if so, can we substitute for a fake "-Inf" value?
+
+5) Add nodal covariate methods. Add this to COV class?
+
+6) Print warning if list of components is 0? 
+
+7)Change input format so that there is a bultin checking for the class or type of the input. 
+
+8)Switcheroo default
+
+9) Write a check for class and type of input.
+
+10) Code crashes when there is NAs on the diagonal of the covariates. 
+
+Done!
+
+-integration of simple network plots (stick-and-ball style). -- this is now "sociogram.plot". May 15 2014
+-RENAME: sr.rows as edgelist -- May 15 2014
+
+-Remove langevin.functions from LMSreference.R -- May 15 2014
+
+-plot for asymmetric block matrix in SBM.
+
+
+
+
+
+
+Probably won't do yet:
+
+
+
+

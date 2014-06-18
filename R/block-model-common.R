@@ -37,6 +37,10 @@ SBM.rotate.bvector <- function(sbm.b.vector, rotation) {
   bvt[,3]
 }
 
+SBM.rotate.block <- function (sbm.block, rotation) {
+  sbm.block[rotation, rotation]
+}
+
 MMSBM.ID.rotation <- function(node.prob.table, label.count=max(ID.labels)) {
   whichmax.sampler <- function(x) {
     items <- which(max(x)==x)

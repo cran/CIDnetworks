@@ -2,6 +2,7 @@
 \alias{Lazega}
 \alias{c.elegans}
 \alias{dolphins}
+\alias{prison}
 
 \title{CIDnetworks: Included Data Sets}
 \description{
@@ -11,6 +12,7 @@
   Lazega
   c.elegans
   dolphins
+  prison
 }
 \format{
   Lazega: A list including six sociomatrices (three directed, three
@@ -20,6 +22,9 @@
   connections between neurons.
 
   dolphins: A symmetric sociomatrix.
+  
+  prison: (Thanks to UCINET) In the 1950s John Gagnon collected sociometric choice data from 67 prison inmates. All were asked, "What fellows on the tier are you closest friends with?" Each was free to choose as few or as many "friends" as he desired. 
+  
 }
 \references{
   
@@ -33,6 +38,8 @@
   
   D. Lusseau, K. Schneider, O. J. Boisseau, P. Haase, E. Slooten, and
   S. M. Dawson, Behavioral Ecology and Sociobiology 54, 396-405 (2003).
+  
+  MacRae J. (1960). Direct factor analysis of sociometric data. Sociometry, 23, 360-371.
  
 }
 \author{A.C. Thomas <act@acthomas.ca>}

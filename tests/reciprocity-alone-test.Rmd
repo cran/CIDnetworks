@@ -1,0 +1,52 @@
+CIDnetworks test: Generative examples with reciprocity alone
+========================================================
+
+```{r}
+
+library(CIDnetworks)
+
+cid.one <- CID (n.nodes=100, int.correlation=0.2, generate=TRUE)  #
+cid.one$plot.network()
+
+cid.one$draw()
+cid.one$draw.int.correlation()
+cid.one$pieces()
+cid.one.gibbs <- cid.one$gibbs.full(draws=50, thin=1, burnin=0)
+cid.one$gibbs.plot(cid.one.gibbs)
+
+g1 <- cid.one$test.int.correlation(-199:199/200);
+plot(exp(g1 - max(g1)))
+
+p1 <- cid.one$pieces()
+p1$int.correlation <- -0.9
+cid.one$value.ext(p1)
+
+
+```
+
+
+
+Tests:
+
+```{r}
+table (cid.one$outcome[1:nrow(cid.one$edge.list)],
+      cid.one$outcome[cid.one$reciprocal.match[1:nrow(cid.one$edge.list)]])
+plot (cid.one$int.outcome[1:nrow(cid.one$edge.list)],
+      cid.one$int.outcome[cid.one$reciprocal.match[1:nrow(cid.one$edge.list)]])
+cor (cid.one$int.outcome[1:nrow(cid.one$edge.list)],
+      cid.one$int.outcome[cid.one$reciprocal.match[1:nrow(cid.one$edge.list)]])
+  
+cid.one$int.correlation.prior(-19:19/20)
+
+```
+
+
+```{r}
+library(mnormt)
+
+
+
+```
+
+
+

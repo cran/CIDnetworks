@@ -3,10 +3,10 @@
 #
 # Gibbs Sampler collection for CID, given the collection of input terms.
 
-#source("COV-reference.R"); source("SBM-reference.R"); source("LSM-reference.R"); source("SR-reference.R"); library(Rcpp); library(mvtnorm); library(msm); sourceCpp ("../src/cid.cpp"); source("CID-basefunctions.R"); 
+#source("COV-reference.R"); source("SBM-reference.R"); source("LSM-reference.R"); source("SR-reference.R"); library(Rcpp); library(mvtnorm); library(msm); sourceCpp ("../src/cid.cpp"); source("CID-basefunctions.R");
 
 .onAttach <- function (...) {
-  packageStartupMessage("CIDnetworks v 0.2.5")
+  packageStartupMessage("CIDnetworks v 0.6.0")
 }
 
 # All subclasses available to CID.
@@ -15,6 +15,7 @@ LSM <- function(...) LSMcid$new(...)
 LVM <- function(...) LVMcid$new(...)
 SBM <- function(...) SBMcid$new(...)
 SR <- function(...) SRcid$new(...)
+BETA <- function(...) BETAcid$new(...)
 COV <- function(...) COVcid$new(...)
 MMSBM <- function(...) MMSBMcid$new(...)
 HBM <- function(...) HBMcid$new(...)
@@ -32,88 +33,143 @@ CIDnetwork <-
     fields = list(
       n.nodes="numeric",
       edge.list="matrix",
-      sr.rows="list",
+      edge.list.rows="list",
       outcome="numeric",
       node.names="character",
-      
-      class.outcome="character",
-      ordinal.count="numeric",
-      ordinal.cutoffs="numeric",
 
-      int.outcome="numeric",
-      
-      intercept="numeric",
-      intercept.m="numeric",
-      intercept.v="numeric",
-      
-      residual.variance="numeric",
-      residual.variance.ab="numeric",
-      robit.augment="numeric",
-      
-      log.likelihood="numeric",
-      
-      components="list",
-      comp.values="matrix"
+      is.directed="logical",
+      class.outcome="character",   #"ordinal" or "gaussian" -- if "binary", it will make it "ordinal"
+      ordinal.count="numeric",
+      ordinal.cutoffs="numeric",   #current draw. Every edge has the same cutoff value with respect to the outcome.
+
+      int.outcome="numeric",  #intermediate outcome, which is Gaussian. If outcome is binary, this is what is truncated.
+
+      intercept="numeric",    #current draw
+      intercept.m="numeric",  #prior mean
+      intercept.v="numeric",  #prior variance
+
+      residual.variance="numeric",   #current draw -- always 1 if binary/ordinal
+      residual.variance.ab="numeric",  #inverse gamma prior parameters -- length 2
+
+      reciprocity.present="logical",
+      reciprocal.match="integer",   #which edge has the other as its counterpart? Use for reciprocity.
+      int.correlation="numeric",
+      int.correlation.ab="numeric",  #symmetric beta prior.
+
+      ## robit.augment="numeric",
+
+      log.likelihood="numeric",   #current log likelihood of data
+
+      components="list",   # updated with every draw -- contains COV, LSM, etc.
+      comp.values="matrix" # after each draw, updates the value as expressed of that object. "value" is the component of the linear predictor for that edge ; each row corresponds to each edge; each column corresponds to each component.
       ),
-    
+
     methods=list(
       initialize = function (
-        
+
         edge.list,    #specs: this should be numbered from 1 to the max edge number.
         sociomatrix,
-        
-        sr.rows,
+
+        edge.list.rows,
         n.nodes,      #this should come from the data.
         node.names=character(),
-                
+
         intercept=0,
         intercept.m=0,
         intercept.v=1000000,
-        
+
         residual.variance=1,
         residual.variance.ab=c(0.001, 0.001),
-        
+
         outcome=numeric(0),
         generate=FALSE,
 
+        is.directed,
         class.outcome="ordinal",
         ordinal.count=2,
         ordinal.cutoffs=sort(rexp(ordinal.count-2, rate=50)),
-        
+
+        int.correlation=0,          #For now, generate nothing.
+        int.correlation.ab=c(1,1),  #Symmetric beta prior.
+        include.reciprocity=FALSE,  #No reciprocity unless asked.
+
         components=list()
-        ) {
+        )
+      {
 
         if (!(class.outcome %in% c("binary","gaussian","ordinal"))) stop (paste("class.outcome",class.outcome,"is not supported. Must be one of", paste(c("binary","gaussian","ordinal"), collapse=",")))
 
+        if (int.correlation != 0) include.reciprocity <- TRUE
+
         if (!missing(sociomatrix)) {
-          if (!(class(sociomatrix) %in% c("array", "matrix"))) stop ("Sociomatrix must be a matrix.")
+          if (!(class(sociomatrix) %in% c("array", "matrix", "data.frame"))) stop ("Sociomatrix must be a matrix or two-dimensional array.")
           if (nrow(sociomatrix) != ncol(sociomatrix)) stop ("Sociomatrix must be square.")
           new.nodes <- nrow(sociomatrix)
           .self$n.nodes <<- new.nodes
-          .self$edge.list <<- make.edge.list (new.nodes)
-          .self$outcome <<- sociomatrix[l.diag(new.nodes)]
+
+          if (missing(is.directed)) {
+            if (all(t(sociomatrix) == sociomatrix, na.rm=TRUE)) {
+              message ("Auto-detected a symmetric sociomatrix; assuming this is an undirected network.")
+              .self$is.directed <<- FALSE
+            } else {
+              message ("Auto-detected an asymmetric sociomatrix; assuming this is a directed network.")
+              .self$is.directed <<- TRUE
+            }
+          } else .self$is.directed <<- is.directed
+
+
+          if (!.self$is.directed) {
+            .self$edge.list <<- make.edge.list (new.nodes)
+            .self$outcome <<- sociomatrix[l.diag(new.nodes)]
+          } else {
+            .self$edge.list <<- make.arc.list (new.nodes)
+            .self$outcome <<- t(sociomatrix)[non.diag(new.nodes)]   #note: arc list changes receiver first, so it's row-based.
+          }
+
         } else {
           if (missing(edge.list)) {
-            if (missing(n.nodes)) stop ("Not detected: n.nodes, edge.list, sociomatrix") else {
+            if (missing(n.nodes)) stop ("Not detected: n.nodes, edge.list, or sociomatrix") else {
               .self$n.nodes <<- n.nodes
-              .self$edge.list <<- make.edge.list (n.nodes)
-              .self$outcome <<- outcome
+              if (!missing(is.directed)) .self$is.directed <<- is.directed else {
+                .self$is.directed <<- include.reciprocity | (int.correlation != 0)
+                if (.self$is.directed) message ("Reciprocity was specified: assuming a DIRECTED network.") else message ("Directedness was unspecified: assuming an undirected network.")
+
+              }
+
+              if (.self$is.directed) {
+                .self$edge.list <<- make.arc.list (n.nodes)
+                .self$outcome <<- outcome
+              } else {
+                .self$edge.list <<- make.edge.list (n.nodes)
+                .self$outcome <<- outcome
+              }
             }
           } else {
             if (missing(n.nodes)) .self$n.nodes <<- max(c(edge.list)) else .self$n.nodes <<- n.nodes
-            .self$edge.list <<- edge.list
-            .self$outcome <<- outcome
+
+            if (missing(is.directed)) {
+
+              e1 <- unique(edge.list)
+
+              e1[e1[,1]>e1[,2],] <- e1[e1[,1]>e1[,2], 2:1]
+              e2 <- unique(e1)
+              if (nrow(e1) != nrow(e2)) {
+                message ("Reciprocal potential edges detected; assuming this is a directed network.")
+                .self$is.directed <<- TRUE
+              } else {
+                message ("No reciprocal potential edges detected; assuming this is an undirected network.")
+                .self$is.directed <<- FALSE
+              }
+
+              .self$edge.list <<- edge.list
+              .self$outcome <<- outcome
+            }
           }
         }
 
-        if (!missing(sr.rows)) {
-          .self$sr.rows <<- sr.rows
-        } else {
-          .self$sr.rows <<- row.list.maker(.self$edge.list)
-        }
+        if (!missing(edge.list.rows)) .self$edge.list.rows <<- edge.list.rows else .self$edge.list.rows <<- row.list.maker(.self$edge.list)
 
         if (length(node.names) != .self$n.nodes) .self$node.names <<- as.character(1:.self$n.nodes) else .self$node.names <<- node.names
-        
 
         if (class.outcome == "binary") {
           .self$class.outcome <<- "ordinal"
@@ -128,20 +184,20 @@ CIDnetwork <-
         .self$intercept <<- intercept
         .self$intercept.m <<- intercept.m
         .self$intercept.v <<- intercept.v
-                
+
         if (class.outcome == "gaussian") {
           .self$residual.variance <<- residual.variance
         } else {
           .self$residual.variance <<- 1
         }
         .self$residual.variance.ab <<- residual.variance.ab
-        
+
 
         #reinitialize components, just in case.
         if (length(components)>0) {
           if (class(components) != "list") components.t <- list(components) else components.t <- components
           for (kk in 1:length(components.t)) {
-            components.t[[kk]]$reinitialize (n.nodes, edge.list, .self$node.names)
+            components.t[[kk]]$reinitialize (.self$n.nodes, .self$edge.list, .self$node.names)
             if (class(components.t[[kk]]) %in% c("SBMcid", "MMSBMcid", "HBMcid")) {
               .self$intercept.m <<- 0
               .self$intercept.v <<- 0.000000000001
@@ -149,42 +205,74 @@ CIDnetwork <-
           }
           .self$components <<- components.t
         } else .self$components <- list()
-        
-        #message("Component initialization complete.")
-        
-        if (generate) .self$generate() else if (length(outcome) == nrow(edge.list)) {
-          .self$outcome <<- outcome
-        } else stop (paste("In CIDnetwork$initialize: Outcome variable length: ",length(outcome),"; Edges: ", nrow(edge.list)))
 
+        #message("Component initialization complete.")
+
+
+
+        #Let's do reciprocity now! ACT, 5-21-14
+        .self$int.correlation <<- int.correlation
+        .self$int.correlation.ab <<- int.correlation.ab
+        message("Reciprocity: ",include.reciprocity)
+
+        reciprocity.present <<- include.reciprocity
+        if (reciprocity.present) {
+          ## find matches.
+          reciprocal.match <<- apply(.self$edge.list, 1, function(ee) min(which (.self$edge.list[,1] == ee[2] & .self$edge.list[,2] == ee[1])))
+        } else {
+          reciprocal.match <<- rep(as.integer(NA), length(outcome))
+        }
+        #int.correlation=0,          #For now, generate nothing.
+        #int.correlation.ab=c(1,1),  #Symmetric beta prior.
+        #include.reciprocity=FALSE,  #No reciprocity unless asked.
+
+
+
+        if (generate) .self$generate() else if (length(outcome) == nrow(.self$edge.list)) {
+          .self$outcome <<- outcome
+        }
+
+        if (length(.self$outcome) != nrow(.self$edge.list))  stop (paste0("In CIDnetwork$initialize: Outcome variable length: ",length(.self$outcome),"; Edges: ", nrow(.self$edge.list),". Did you forget to add a required variable?"))
 
         # Check for empty categories, currently disallowed.
         if (class.outcome == "ordinal") {
-          counts <- sapply(0:(.self$ordinal.count-1), function(cc) sum(.self$outcome == cc))
-          if (any(counts == 0)) stop ("The following ordinal categories have no outcomes: ", paste(which(counts == 0)-1, collapse=" "))
+          counts <- tabulate (.self$outcome + 1, .self$ordinal.count)
+          if (any(counts == 0)) stop ("The following ordinal categories have no outcomes: ", paste(which(counts == 0)-1, collapse=" "), "; required non-zero counts for ", paste (0:(.self$ordinal.count-1), collapse=" "))
         }
-        
 
-        
+
+
+
         #message("Generation complete.")
-        
+
         update.intermediate.outcome ()
         #message("CID Initialization complete.")
-         
+
       },
-      
+
       reinitialize = function (n.nodes=NULL, edge.list=NULL, node.names=NULL) {
         if (!is.null(n.nodes)) n.nodes <<- n.nodes
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
-          sr.rows <<- row.list.maker(edge.list)
+          edge.list.rows <<- row.list.maker(edge.list)
         }
-        
-        if (length(components)>0) for (kk in 1:length(components)) components[[kk]]$reinitialize (n.nodes, edge.list, node.names)
 
         if (!is.null(node.names)) {
-          if (length(node.names) == .self$n.nodes) node.names <<- node.names
+            if (length(node.names) == .self$n.nodes) node.names <<- node.names
         } else node.names <<- as.character(1:.self$n.nodes)
-        
+
+
+        if (length(components)>0) for (kk in 1:length(components)) components[[kk]]$reinitialize (.self$n.nodes, .self$edge.list, .self$node.names)
+
+
+        if (reciprocity.present) {
+          ## find matches.
+          reciprocal.match <<- apply(edge.list, 1, function(ee) min(which (edge.list[,1] == ee[2] & edge.list[,2] == ee[1])))
+        } else {
+          reciprocal.match <<- rep(as.integer(NA), length(outcome))
+        }
+
+
       },
 
       pieces = function (include.name=FALSE) {
@@ -192,25 +280,27 @@ CIDnetwork <-
           c(list(intercept=intercept,
                  residual.variance=residual.variance,
                  log.likelihood=log.likelihood,
-                 ordinal.cutoffs=ordinal.cutoffs),
+                 ordinal.cutoffs=ordinal.cutoffs,
+                 int.correlation=int.correlation),
             lapply(components, function(cc) cc$pieces(include.name)))
         } else {
           list(intercept=intercept,
                residual.variance=residual.variance,
                log.likelihood=log.likelihood,
-               ordinal.cutoffs=ordinal.cutoffs)
+               ordinal.cutoffs=ordinal.cutoffs,
+               int.correlation=int.correlation)
         }
       },
 
       show = function () {
         message("CIDnetwork object properties:")
-        
+
         message(paste("class.outcome:", class.outcome))
         if (class.outcome == "ordinal") message(paste("Ordinal groups:", ordinal.count))
         message(paste("Nodes:", n.nodes))
         message(paste("Edges:", nrow(edge.list)))
-        
-        
+
+
         message("Intercept: ", intercept)
         message("Variance: ", residual.variance)
         if (length(components)>0) for (kk in 1:length(components)) {
@@ -222,7 +312,7 @@ CIDnetwork <-
         if (length(components) > 0) for (cc in 1:length(components)) components[[cc]]$plot()
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, node.labels=node.names, ...)
+        image.netplot (edge.list, color, node.labels=node.names, ...)
       },
 
       value = function (redo=FALSE) {
@@ -235,36 +325,65 @@ CIDnetwork <-
       },
 
       summary = function () show(),
-      
+
 
       generate = function () {
-        int.outcome <<- rnorm(nrow(edge.list),
-                              value(redo=TRUE),
-                              sqrt(residual.variance))
+
+        # Built 5-21-14. Tested: ----
+        if (reciprocity.present) {
+
+          int.deviation <- matrix(rnorm(2*nrow(edge.list), 0, sqrt(residual.variance)), ncol=2)
+          int.deviation[,2] <- int.correlation*int.deviation[,1] + sqrt(1-int.correlation^2)*int.deviation[,2]
+
+          swaps <- which(edge.list[,1]>edge.list[,2] & !is.na(reciprocal.match))
+
+          int.deviation[swaps,1] <- int.deviation[reciprocal.match[swaps],2]
+          int.outcome <<- value(redo=TRUE) + int.deviation[,1]
+
+        } else {
+
+          int.outcome <<- rnorm(nrow(edge.list),
+                                value(redo=TRUE),
+                                sqrt(residual.variance))
+
+        }
+
+
         if (class.outcome == "ordinal") {
           temp.out <- 0*int.outcome
           ordinal.steps <- c(0, ordinal.cutoffs)
           for (ii in 1:length(ordinal.steps)) temp.out <- temp.out + 1*(int.outcome > ordinal.steps[ii])
           outcome <<- temp.out
         }
-        if (class.outcome == "gaussian") outcome <<- int.outcome        
+        if (class.outcome == "gaussian") outcome <<- int.outcome
       },
-      
-      
+
+
       rem.values = function(kk) {if (kk>0) value() - comp.values[,kk] else value() - intercept},
-      
 
-      
+      update.comp.values = function () {
+        if (length(components)>0) comp.values <<- sapply (components, function(cc) cc$value()) else comp.values <<- matrix(0, nrow=nrow(edge.list))
+      },
 
+
+
+      ## Update Z_ij.
       update.intermediate.outcome = function () {
         if (class.outcome == "ordinal") {
           #first, update the values themselves.
           value.hold <- value(redo=TRUE)
           io.temp <- int.outcome
 
+          #matched.value <- value.hold[reciprocal.match]
+          lohi <- edge.list[,1] < edge.list[,2]
+
           breaker.lower <- c(-Inf, 0, ordinal.cutoffs)
           breaker.upper <- c(0, ordinal.cutoffs, Inf)
-          
+
+          breakers.lower <- breaker.lower[outcome + 1]
+          breakers.upper <- breaker.upper[outcome + 1]
+
+
           #are any going to be trouble?
           p.gen <- rep(0.5, length(outcome))
           for (ii in 1:ordinal.count) {
@@ -272,38 +391,99 @@ CIDnetwork <-
               pnorm(breaker.upper[ii], value.hold[outcome == ii-1], 1) - pnorm(breaker.lower[ii], value.hold[outcome == ii-1], 1)
           }
 
-          for (ii in 1:ordinal.count) {
-            io.temp[outcome == ii-1 & p.gen > 1e-10] <-
-              rtnorm(sum(outcome == ii-1 & p.gen > 1e-10),
-                     value.hold[outcome == ii-1 & p.gen > 1e-10], 1,
-                     lower=breaker.lower[ii], upper=breaker.upper[ii])
-            io.temp[outcome == ii-1 & p.gen <= 1e-10] <- (breaker.lower[ii]+breaker.upper[ii])/2
-            if (ii == 1) io.temp[outcome == ii-1 & p.gen <= 1e-10] <- breaker.upper[ii]
-            if (ii == ordinal.count) io.temp[outcome == ii-1 & p.gen <= 1e-10] <- breaker.lower[ii]
-          }
-            
+          #for (ii in 1:ordinal.count) {
+          ## unmatched edges.
+          condition <- p.gen > 1e-10 & is.na(reciprocal.match)
+          io.temp[condition] <-
+            rtnorm(sum(condition),
+                   value.hold[condition], 1,
+                   lower=breakers.lower[condition],
+                   upper=breakers.upper[condition])
+
+            #matched edges, (lower, higher).
+          condition <- p.gen > 1e-10 & !is.na(reciprocal.match) & lohi
+          io.temp[condition] <-
+            rtnorm(sum(condition),
+                   value.hold[condition] + int.correlation*(io.temp[reciprocal.match[condition]] - value.hold[reciprocal.match[condition]]),
+                   1 - int.correlation^2,
+                   lower=breakers.lower[condition],
+                   upper=breakers.upper[condition])
+
+            #matched edges, (higher, lower).
+          condition <- p.gen > 1e-10 & !is.na(reciprocal.match) & !lohi
+          io.temp[condition] <-
+            rtnorm(sum(condition),
+                   value.hold[condition] + int.correlation*(io.temp[reciprocal.match[condition]] - value.hold[reciprocal.match[condition]]),
+                   1 - int.correlation^2,
+                   lower=breakers.lower[condition],
+                   upper=breakers.upper[condition])
+
+          io.temp[p.gen <= 1e-10] <- (breakers.lower[p.gen <= 1e-10]+breakers.upper[p.gen <= 1e-10])/2
+          io.temp[outcome == 0 & p.gen <= 1e-10] <- (breakers.upper[outcome == 0 & p.gen <= 1e-10])
+          io.temp[outcome == ordinal.count - 1 & p.gen <= 1e-10] <- (breakers.lower[outcome == ordinal.count - 1 & p.gen <= 1e-10])
+
           int.outcome <<- io.temp
 
           #now, change the cutoff values, which lie between the Z values for each one. Assume a flat prior for now.
           if (length(ordinal.cutoffs)>0) for (kk in 1:length(ordinal.cutoffs)) {
             effective.range <- c(max(int.outcome[outcome <= kk]), min(int.outcome[outcome >= kk+1]))
             if (is.na(effective.range[1])) effective.range[1] <- 0
-            if (is.na(effective.range[2])) effective.range[1] <- 10000            
+            if (is.na(effective.range[2])) effective.range[1] <- 10000
             ordinal.cutoffs[kk] <<- runif(1, effective.range[1], effective.range[2])
           }
-          
+
         }
         if (class.outcome == "gaussian") {int.outcome <<- outcome}
       },
-      
-      update.comp.values = function () {
-        if (length(components)>0) comp.values <<- sapply (components, function(cc) cc$value()) else comp.values <<- matrix(0, nrow=nrow(edge.list))
+
+
+
+      ## Simple slice sampler for autocorrelation term \rho. Pretty optimized! Act, 6-3-14
+      int.correlation.prior = function (pp = int.correlation) {
+        dbeta((1+pp)/2,  int.correlation.ab[1], int.correlation.ab[2], log=TRUE) - log(2)
       },
 
+      #Note: this is being drawn from the main likelihood, not the intermediate likelihood, because it's more efficient for the whole chain.
+      draw.int.correlation = function () {
+
+        these.pieces <- pieces()
+        current.value <- int.correlation
+
+        #First: draw uniform at current value and establish the vertical cut.
+        cut.1 <- log(runif(1)) +
+          log.likelihood.by.value(value.ext(these.pieces), these.pieces, use.intermediate=TRUE) +
+            int.correlation.prior(current.value)
+        limits <- c(-0.9999,0.9999)
+
+        emergency.count <- 0
+        repeat {
+          prop.value <- runif(1, limits[1], limits[2])   #Draw proposal value between the bounds.
+          these.pieces$int.correlation <- prop.value
+          if (log.likelihood.by.value(value.ext(these.pieces), these.pieces, use.intermediate=TRUE) +  #, use.intermediate=TRUE
+              int.correlation.prior(prop.value) > cut.1) {   #is the current density above the threshold?
+            int.correlation <<- prop.value; break    #keep it and save.
+          } else limits[1 + 1*(prop.value > current.value)] <- prop.value    #Trim down.
+
+          emergency.count <- emergency.count+1; if (emergency.count > 1000) stop ("In draw.int.correlation, way too many narrows-down were made. This is either at a peak or it's broken.")
+        }
+
+      },
+
+      #What does the grid say?
+      test.int.correlation = function (rho=seq(-19,19)/20) {
+        these.pieces <- pieces()
+        sapply (rho, function (rr) {
+          these.pieces$int.correlation <- rr
+          log.likelihood.by.value(value.ext(these.pieces), these.pieces, use.intermediate=TRUE) + int.correlation.prior(rr)
+        })
+      },
+
+
+
+
       draw.intercept = function (verbose=FALSE) {
-        
+
         outcomeresid <- int.outcome - rem.values(0);
-        
         varpiece <- solve(nrow(edge.list)/residual.variance + 1/intercept.v)
         meanpiece <- varpiece*(sum(outcomeresid)/residual.variance + intercept.m/intercept.v)
         if (verbose) message ("Intercept ",meanpiece," ",sqrt(varpiece))
@@ -311,40 +491,84 @@ CIDnetwork <-
 
       },
 
-      log.likelihood.by.value = function (value.this=value(), sumup=TRUE) {
-        output <- NULL
-        if (class.outcome == "gaussian") {
+      ## Note: getting this to work for 2D pmvnorm. ACT, 5-23-14
+      log.likelihood.by.value = function (value.this=value(),
+        pieces.this=pieces(),
+        sumup=TRUE,
+        use.intermediate=FALSE)
+      {
+        cm <- function(pp) matrix(c(1,pp,pp,1), nrow=2)
+        output <- 0*int.outcome
+        if (class.outcome == "gaussian" | use.intermediate) {
           outcomeresid <- int.outcome - value.this
-          output <- dnorm(outcomeresid, 0, sqrt(residual.variance), log=TRUE)
-        }
-        
-        if (class.outcome == "ordinal") {
+          if (reciprocity.present) {
+            picks <- which(is.na(reciprocal.match))
+            output[picks] <- dnorm(outcomeresid[picks], 0, sqrt(pieces.this$residual.variance), log=TRUE)
 
-          breaker.lower <- c(-Inf, 0, ordinal.cutoffs)
-          breaker.upper <- c(0, ordinal.cutoffs, Inf)
-          
-          output <- 0*int.outcome
-          for (ii in 1:(length(breaker.lower)-1))
-            output[outcome == ii-1] <- log(
-                     pnorm(rep(breaker.upper[ii], sum(outcome == ii-1)),
-                           value.this[outcome == ii-1],
-                           sqrt(residual.variance)) -
-                     pnorm(rep(breaker.lower[ii], sum(outcome == ii-1)),
-                           value.this[outcome == ii-1],
-                           sqrt(residual.variance)))
-                    
-          #outs <- value.this
-          #outs[outcome==0] <- -outs[outcome==0]
-          #output <- pnorm(outs, 0, sqrt(residual.variance), log=TRUE)
+            picks2 <- which (!is.na(reciprocal.match) & edge.list[,1] < edge.list[,2])
+            output[picks2] <- dmvnorm(cbind(outcomeresid[picks2], outcomeresid[reciprocal.match[picks2]]),
+                                      rep(0, 2),
+                                      pieces.this$residual.variance*cm(pieces.this$int.correlation),
+                                      log=TRUE)
+          } else output <- dnorm(outcomeresid, 0, sqrt(pieces.this$residual.variance), log=TRUE)
+        } else if (class.outcome == "ordinal") {
+
+          breaker.lower <- c(-Inf, 0, pieces.this$ordinal.cutoffs)
+          breaker.upper <- c(0, pieces.this$ordinal.cutoffs, Inf)
+
+          breakers.lower <- breaker.lower[outcome + 1]
+          breakers.upper <- breaker.upper[outcome + 1]
+
+          # first: unmatched edges.
+          if (reciprocity.present) {
+            picks <- which(is.na(reciprocal.match))
+            output[picks] <- log(
+              pnorm(breakers.upper[picks],
+                    value.this[picks],
+                    sqrt(pieces.this$residual.variance)) -
+              pnorm(breakers.lower[picks],
+                    value.this[picks],
+                    sqrt(pieces.this$residual.variance)))
+
+            ## now, matched edges.
+            picks2 <- which (!is.na(reciprocal.match) & edge.list[,1] < edge.list[,2])
+
+            ## ACT was working on this. See basefunctions line 51
+            output[picks2] <- my.pmvnorm(lower=matrix(breakers.lower[c(picks2, reciprocal.match[picks2])], ncol=2),
+                                         upper=matrix(breakers.upper[c(picks2, reciprocal.match[picks2])], ncol=2),
+                                         meanval=matrix(value.this[c(picks2, reciprocal.match[picks2])], ncol=2),
+                                         sigma=pieces.this$residual.variance,
+                                         rho=pieces.this$int.correlation)
+
+            #this.output <- sapply(picks2, function (pp) {
+            #  pmvnorm (breakers.lower[c(pp, reciprocal.match[pp])],
+            #          breakers.upper[c(pp, reciprocal.match[pp])],
+            #           mean=value.this[c(pp, reciprocal.match[pp])],
+            #           sigma=pieces.this$residual.variance*matrix(c(1, pieces.this$int.correlation, pieces.this$int.correlation, 1), nrow=2))})
+            #output[picks2] <- log(this.output)
+
+          } else {
+
+            output <- log(
+              pnorm(breakers.upper,
+                    value.this,
+                    sqrt(pieces.this$residual.variance)) -
+              pnorm(breakers.lower,
+                    value.this,
+                    sqrt(pieces.this$residual.variance)))
+
+          }
+
         }
+
         if (sumup) output <- sum(output)
         return(output)
       },
-      
+
       update.log.likelihood = function () {
-        log.likelihood <<- log.likelihood.by.value ()        
+        log.likelihood <<- log.likelihood.by.value ()
       },
-      
+
       draw.variance = function (verbose=FALSE) {
         outcomeresid <- int.outcome - value();
 
@@ -353,20 +577,21 @@ CIDnetwork <-
           1/rgamma(1,
                    residual.variance.ab[1] + nrow(edge.list)/2,
                    residual.variance.ab[2] + sum(outcomeresid^2)/2)
-        
+
       },
-      
+
       draw = function (verbose=FALSE) {
-        
+
+        if (reciprocity.present) draw.int.correlation()
         if (class.outcome != "gaussian") update.intermediate.outcome()
-  
+
         if (length(components)>0) for (kk in 1:length(components)) {
           update.comp.values()
           components[[kk]]$outcome <<- .self$int.outcome - rem.values(kk)
           components[[kk]]$residual.variance <<- residual.variance
           components[[kk]]$draw()
 
-          if (exists("shift", components[[kk]])) {
+          if (exists("shift", components[[kk]])) {   ### - where does this currently arise?
             intercept <<- intercept + components[[kk]]$shift
             components[[kk]]$shift <<- 0
           }
@@ -375,41 +600,48 @@ CIDnetwork <-
         #variance and intercept.
         update.comp.values()
         draw.intercept(verbose)
-        
+
         if (class.outcome == "gaussian") {
           update.comp.values()
           draw.variance(verbose)
           update.comp.values()
         }
-        
+
+        ## update correlation!!! ACT, 5-23-14
+
         update.log.likelihood()
-        
+
       },
-      
+
       random.start = function () {
         intercept <<- rnorm (1, 0, 1)
 #        draw.intercept()
         if (length(components)>0) for (kk in 1:length(components)) components[[kk]]$random.start()
         if (class.outcome == "gaussian") draw.variance()
+        if (reciprocity.present) draw.int.correlation()
+
         update.log.likelihood()
 
       },
-      
+
       gibbs.full = function (
         report.interval=100, draws=100,
-        burnin=0, thin=10,   #auto-cut.
+        burnin=-1, thin=10,   #auto-cut.
         auto.burn.cut=TRUE,
         auto.burn.count=200,
         make.random.start=TRUE) {
 
         #if (auto.burn.cut) {thin <- 10; burnin <- 0}
         if (thin < 1) stop ("thin must be an integer greater than zero.")
-        if (burnin < 0) stop ("burnin must be an integer greater than or equal to zero.")
-        if (burnin > 0) {
+        if (burnin >= 0) {
           message ("Overriding auto burn-in and cut. Initially discarding ",burnin," iterations.")
           auto.burn.cut <- FALSE
+        } else if (burnin < 0 & !auto.burn.cut) {
+          message ("Negative burn-in inputted -- defaulting to auto-burn-in.")
+          auto.burn.cut <- TRUE
         }
-        
+
+
         out <- list()
         if (make.random.start) random.start()
 
@@ -433,12 +665,12 @@ CIDnetwork <-
             if (is.na(slopes)) message ("CID Still Auto-Burning In") else if (slopes<0) break else message ("CID Still Auto-Burning In")
             #}
           }
-          
+
           message ("CID Auto-Burned In. Estimated Seconds Remaining: ", round(time.two/auto.burn.count*thin*draws))
           burnin <- 0
         }
 
-        
+
         for (kk in 1:(draws*thin+burnin)) {
           draw();
           index <- (kk-burnin)/thin
@@ -450,83 +682,208 @@ CIDnetwork <-
           }
         }
 
-        
+
         return(out)
       },
 
+      #Removes magic number later. This should be the length of (intercept, residual, loglik, cutoffs, int.correlation).
+      non.comp.count = function () 5,
 
 
-      
       gibbs.value = function (gibbs.out) sapply(gibbs.out, function(gg) {
         value.ext (gg)
       }),
 
-      gibbs.switcheroo = function (gibbs.out) {
+      gibbs.switcheroo = function (gibbs.out) {   #returns the chain for each component/parameter.
         out <- lapply(1:length(gibbs.out[[1]]), function(el)
                       lapply(1:length(gibbs.out), function(el2) gibbs.out[[el2]][[el]]))
-        out
+        out.names <- c("intercept","res.variance","log.lik",
+                        "ordinal.cuts","reciprocity")
+        s.total <- length(out)
+        if(s.total > non.comp.count()){
+            sapply(out,FUN=function(x)return(class(x[[1]])))
+            comp.classes <- sapply(out,FUN=function(x) return(class(x[[1]])))
+            out.names <- c(out.names,
+                           comp.classes[(non.comp.count()+1):s.total])
+        }
+        names(out) <- out.names
+        return(out)
       },
-      
-      gibbs.summary = function (gibbs.out) {
-        switched <- gibbs.switcheroo (gibbs.out)
-        s.sum <- function (int1) c(min=min(int1), max=max(int1), mean=mean(int1), sd=sd(int1), quantile(int1, c(0.025, 0.975)))
+
+#      gibbs.summary = function (gibbs.out) {
+#        switched <- gibbs.switcheroo (gibbs.out)
+#        s.sum <- function (int1) c(min=min(int1), max=max(int1), mean=mean(int1), sd=sd(int1), quantile(int1, c(0.025, 0.975)))
+#        out <- list()
+
+#        out$intercept <- s.sum(unlist(switched[[1]]))
+#        message ("Intercept:"); print(out$intercept)
+
+#        out$residual.variance <- s.sum(unlist(switched[[2]]))
+#        if (out$residual.variance[4] != 0) {  #SD
+#          message ("Residual variance:")
+#          print (out$residual.variance)
+#        }
+
+#        out$log.likelihood <- s.sum(unlist(switched[[3]]))
+#        message ("Log likelihood:"); print(out$log.likelihood)
+
+#        if (class.outcome == "ordinal") if (ordinal.count > 2) {
+#          o1 <- matrix(unlist(switched[[4]]), nrow=ordinal.count-2)
+#          out$ordinal.cutoffs <- t(apply(o1, 1, s.sum))
+#          rownames(out$ordinal.cutoffs) <- paste("Cutoff", 1:(ordinal.count-2), 2:(ordinal.count-1), sep="-")
+#          message ("Ordinal cutoffs:")
+#          print (out$ordinal.cutoffs)
+#        }
+
+#        if (length(components) > 0) for (cc in 1:length(components)) {
+#          message ("Component ", class(components[[cc]]),":")
+#          out[[cc+non.comp.count()]] <- components[[cc]]$print.gibbs.summary(switched[[cc+non.comp.count()]])
+#          names(out)[cc+non.comp.count()] <- class(components[[cc]])
+#        }
+
+#        out <- structure(out,class="summary.CID.Gibbs")
+#        return(invisible(out))
+#      },
+
+    gibbs.summary = function (gibbs.out) {
+        switched <- gibbs.switcheroo (gibbs.out$results)
+        s.sum <- function (int1) {c(min=round(min(int1),3), max=round(max(int1),3), estimated.mean= round(mean(int1),3), estimated.sd=round(sd(int1),3), round(quantile(int1, c(0.025, 0.975)),3))
+}
         out <- list()
 
         out$intercept <- s.sum(unlist(switched[[1]]))
-        message ("Intercept:"); print(out$intercept)
-        
+
         out$residual.variance <- s.sum(unlist(switched[[2]]))
-        if (out$residual.variance[4] != 0) {  #SD
-          message ("Residual variance:")
-          print (out$residual.variance)
-        }
-        
+
         out$log.likelihood <- s.sum(unlist(switched[[3]]))
-        message ("Log likelihood:"); print(out$log.likelihood)
 
         if (class.outcome == "ordinal") if (ordinal.count > 2) {
           o1 <- matrix(unlist(switched[[4]]), nrow=ordinal.count-2)
           out$ordinal.cutoffs <- t(apply(o1, 1, s.sum))
           rownames(out$ordinal.cutoffs) <- paste("Cutoff", 1:(ordinal.count-2), 2:(ordinal.count-1), sep="-")
-          message ("Ordinal cutoffs:")
-          print (out$ordinal.cutoffs)
-        }
-        
-        if (length(components) > 0) for (cc in 1:length(components)) {
-          message ("Component ", class(components[[cc]]),":")
-          out[[cc+4]] <- components[[cc]]$print.gibbs.summary(switched[[cc+4]])
-          names(out)[cc+4] <- class(components[[cc]])
+        }else{
+            out$ordinal.cutoffs <- NULL
         }
 
-        return(invisible(out))
+        if (length(components) > 0) for (cc in 1:length(components)) {
+            ncc <- non.comp.count()
+            out[[cc+ncc]] <- components[[cc]]$gibbs.summary(switched[[cc+ncc]])
+            names(out)[cc+non.comp.count()] <- class(components[[cc]])
+        }
+
+        out$CID.object <- gibbs.out$CID.object
+        out <- structure(out,class="summary.CID.Gibbs")
+        return(out)
       },
 
-      
-      gibbs.plot = function (gibbs.out, DIC=NULL, which.plots=1:(length(components)+4), auto.layout=TRUE) {
-        
+#      print.gibbs.summary = function (gibbs.out) {
+#        switched <- gibbs.switcheroo (gibbs.out)
+#        s.sum <- function (int1) {c(min=round(min(int1),3), max=round(max(int1),3), estimated.mean = round(mean(int1)), estimated.sd=round(sd(int1),3), round(quantile(int1, c(0.025, 0.975)),3))}
+#        out <- list()
+#
+#        out$intercept <- s.sum(unlist(switched[[1]]))
+#        message ("Intercept:"); print(out$intercept)
+#
+#        out$residual.variance <- s.sum(unlist(switched[[2]]))
+#        if (out$residual.variance[4] != 0) {  #SD
+#          message ("Residual variance:")
+#          print (out$residual.variance)
+#        }
+#
+#        out$log.likelihood <- s.sum(unlist(switched[[3]]))
+#        message ("Log likelihood:"); print(out$log.likelihood)
+#
+#        if (class.outcome == "ordinal") if (ordinal.count > 2) {
+#          o1 <- matrix(unlist(switched[[4]]), nrow=ordinal.count-2)
+#          out$ordinal.cutoffs <- t(apply(o1, 1, s.sum))
+#          rownames(out$ordinal.cutoffs) <- paste("Cutoff", 1:(ordinal.count-2#), 2:(ordinal.count-1), sep="-")
+#          message ("Ordinal cutoffs:")
+#          print (out$ordinal.cutoffs)
+#        }
+#
+#        if (length(components) > 0) for (cc in 1:length(components)) {
+#          message ("Component ", class(components[[cc]]),":")
+#          out[[cc+non.comp.count()]] <- components[[cc]]$print.gibbs.summary(#switched[[cc+non.comp.count()]])
+#          names(out)[cc+non.comp.count()] <- class(components[[cc]])
+#        }
+#
+#        out <- structure(out,class="summary.CID.Gibbs")
+#        return(invisible(out))
+#      },
+
+
+        print.gibbs.summary = function(gibbs.sum){
+
+            message ("Intercept:"); print(gibbs.sum$intercept)
+            if (gibbs.sum$residual.variance[4] != 0) {  #SD
+		message ("Residual variance:")
+		print (gibbs.sum$residual.variance)
+            }
+
+            message ("Log likelihood:"); print(gibbs.sum$log.likelihood)
+
+            if(!is.null(gibbs.sum$residual.variance)){
+                message ("Residual variance:")
+                print (gibbs.sum$residual.variance)
+            }
+
+            if (class.outcome == "ordinal") if (ordinal.count > 2) {
+        	message ("Ordinal cutoffs:")
+        	print (gibbs.sum$ordinal.cutoffs)
+            }
+
+            if(!is.null(gibbs.sum$ordinal.cutoffs)){
+                message ("Ordinal cutoffs:")
+                print (gibbs.sum$ordinal.cutoffs)
+            }
+
+            if (length(components) > 0) for (cc in 1:length(components)) {
+#		message ("Component ", class(components[[cc]]),":")
+                ix <- which(names(gibbs.sum) == class(components[[cc]]))
+                components[[cc]]$print.gibbs.summary(gibbs.sum[[ix]])
+#		print(round(gibbs.sum$class(components[[cc]])),3)
+            }
+            return()#invisible(gibbs.sum))
+        },
+
+      gibbs.plot = function (gibbs.out, DIC=NULL, which.plots=1:(length(components)+5), auto.layout=TRUE) {
+
         switched <- gibbs.switcheroo (gibbs.out)
 
         if (auto.layout) {
           if (intercept.v < 0.0001) which.plots <- which.plots[which.plots != 1]
           if (class.outcome != "gaussian") which.plots <- which.plots[which.plots != 2]
           if (ordinal.count == 2) which.plots <- which.plots[which.plots != 4]
+          if (!reciprocity.present) which.plots <- which.plots[which.plots != 5]
           cols <- ceiling(length(which.plots)/2)
           par(mfrow=c(2, cols))
         }
-        
+
+        ## 1: Grand Intercept
         if (1 %in% which.plots & intercept.v >= 0.0001) plot.default (unlist(switched[[1]]),
                                               main="Grand Intercept",
                                               xlab="Iteration",
                                               ylab="Intercept")
+
+        ## 2: Residual variance. Skipped if not gaussian.
         if (2 %in% which.plots & class.outcome=="gaussian")
           plot.default (unlist(switched[[2]]), main="Residual Variance",
                                               xlab="Iteration",
-                                              ylab="Residual Variance")
-        main.label <- "Log-likelihood"; if (!is.null(DIC)) main.label <- paste0(main.label, ": DIC = ",signif(DIC, 5))
-        if (3 %in% which.plots)
+                        ylab="Residual Variance")
+        main.label <- "Log-likelihood"; if (!is.null(DIC)) {
+          main.label <- paste0(main.label, ": DIC = ",signif(DIC[1], 5))
+          if (length(DIC)>=2) main.label <- paste0(main.label, "\nDeviance of Average = ",signif(DIC[2], 5))
+          if (length(DIC)>=3) main.label <- paste0(main.label, "\nEffective Parameter Count = ",signif(DIC[3], 5))
+        }
+
+        ## 3: Log-likelihood
+        if (3 %in% which.plots) {
           plot.default (unlist(switched[[3]]), main=main.label,
                                               xlab="Iteration",
                                               ylab="Log Likelihood")
+        }
+
+        ## 4: Ordinal cutoffs.
         if (4 %in% which.plots & class.outcome=="ordinal" & ordinal.count>2) {
           draws <- length(unlist(switched[[1]]))
           xx <- sort(rep(1:draws, ordinal.count-2))
@@ -536,17 +893,32 @@ CIDnetwork <-
                         ylab="Cutoff Value")
           abline(h=0, col=8)
         }
-        
-        if (length(components) > 0) for (cc in 1:length(components)) if (4+cc %in% which.plots) components[[cc]]$gibbs.plot(switched[[cc+4]])
-        
+
+        ## 5: Reciprocity
+        if (5 %in% which.plots & reciprocity.present) {
+          main.label <- "Reciprocal Correlation"
+          plot.default (unlist(switched[[5]]), main=main.label,
+                        xlab="Iteration",
+                        ylab="Reciprocal Correlation")
+
+
+        }
+
+        #6 to (5 + length(components)): components!
+        if (length(components) > 0) for (cc in 1:length(components)) if ((non.comp.count()+cc) %in% which.plots) components[[cc]]$gibbs.plot(switched[[cc+non.comp.count()]])
+
       },
-      
-      
-      DIC = function (gibbs.out) {
+
+
+      DIC = function (gibbs.out, add.parts=FALSE) {
         all.values <- gibbs.value(gibbs.out)
         deviance.of.average <- -2*log.likelihood.by.value (apply(all.values, 1, mean))
         average.deviance <- mean(-2*apply(all.values, 2, log.likelihood.by.value))
-        return(2*average.deviance - deviance.of.average)
+        output <- c(DIC=2*average.deviance - deviance.of.average)
+        if (add.parts) output <- c(output,
+                                   deviance.of.average=deviance.of.average,
+                                   effective.parameters=average.deviance - deviance.of.average)
+        return(output)
       },
 
       marginal.loglikelihood = function (gibbs.out) {
@@ -565,28 +937,54 @@ CIDnetwork <-
     )
     )
 
+### print.CIDnetwork <- function (x, ...) {}
+### plot.CIDnetwork <- function (x, ...) {}
+### summary.CIDnetwork <- function (object, ...) {}
+
+
+
+
+###############################################################
+####################  USER FUNCTIONS  #########################
+###############################################################
+
+
 CID <- function (...) CIDnetwork$new(...)
-CID.generate <- function (...) CIDnetwork$new(...)
+CID.generate <- function (...) CIDnetwork$new(..., generate=TRUE)
 
-CID.Gibbs <- function (edge.list,
-                       outcome,
-                       sociomatrix,
+CID.Gibbs <- function (input, # Must be edge.list, sociomatrix, CID.object or
+                              # CID.Gibbs.object
+                       outcome, # Only used when input is an edge.list
+                       ##edge.list,
+                       ##outcome,
+                       ##sociomatrix,
 
-                       CID.object,
-                       
-                       #n.nodes=max(edge.list),
+                       ##CID.object,
+                       ##CID.Gibbs.object,
+
+                       ##n.nodes=max(edge.list),
                        components=list(),
                        class.outcome=NULL,
                        fill.in.missing.edges=missing(outcome),
-                         
+                       new.chain=FALSE,
+
+                       draws=100,
+                       burnin=-1,  ## burnin = -1 performs auto-burnin.
+                       thin=10,
+
                        ...) {
   #edge.list=n0$edge.list; outcome=n0$outcome; components=list(); n.nodes=max(edge.list)
   #edge.list=dolphins; components=list(LSM(2)); class.outcome=NULL
+  #data(prison); sociomatrix=prison
 
-  if (missing(CID.object)) {
-  
-    if (missing(sociomatrix)) {
-      if (missing(edge.list)) stop ("Neither an edge list not sociomatrix was provided.")
+    if(!is(input,"CID.Gibbs")) {  #missing(CID.Gibbs.object)){
+
+        if(!is(input,"CIDnetwork")) {
+
+    if ((is(input,"matrix") | is(input,"data.frame") | is(input,"array")) && ncol(input) == 2) { ##if we have an edgelist
+       edge.list <- input
+      if (!(class(edge.list) %in% c("matrix", "array", "data.frame"))) stop ("The edge.list provided must be an array, matrix or data frame with two columns; this is not an array, matrix or data frame.")
+      if (ncol(edge.list) != 2) stop ("The edge.list provided must have two columns.")
 
       edge.list <- cbind(as.character(edge.list[,1]), as.character(edge.list[,2]))
       if (any(edge.list[,1] == edge.list[,2])) {
@@ -595,14 +993,14 @@ CID.Gibbs <- function (edge.list,
         edge.list <- edge.list[nonselfies,]
         if (!missing(outcome)) outcome <- outcome[nonselfies]
       }
-      
+
       #node.names <- unique(c(as.character(edge.list[,1]), as.character(edge.list[,2])))
       node.names <- unique(c(edge.list[,1], edge.list[,2]))
-      
+
       n.nodes <- length(node.names)
       numbered.edge.list <- cbind (match(edge.list[,1], node.names),
                                    match(edge.list[,2], node.names))
-        
+
       if (missing(outcome) | fill.in.missing.edges) {
         if (missing(outcome)) message("Assuming that this is a complete network with specified edges as binary ties.") else message("Filling in unspecified edges as zeroes.")
 
@@ -614,14 +1012,14 @@ CID.Gibbs <- function (edge.list,
                                                     numbered.edge.list[rr,1] == new.edge.list[,2]))))
 
         rowmatch <- rowmatch[is.finite(rowmatch)]
-          
+
         temp.outcome <- rep(0, nrow(new.edge.list))
         if (missing(outcome)) {
           temp.outcome[rowmatch] <- 1
         } else {
           temp.outcome[rowmatch] <- outcome[is.finite(rowmatch)]
         }
-        
+
         outcome <- temp.outcome
         edge.list <- new.edge.list
 
@@ -629,9 +1027,17 @@ CID.Gibbs <- function (edge.list,
         edge.list <- numbered.edge.list
       }
     } else {
+        sociomatrix <- input
+        if (nrow(sociomatrix) != ncol(sociomatrix)) stop ("The provided sociomatrix is not square.")
+
       n.nodes <- nrow(sociomatrix)
-      edge.list <- make.edge.list (n.nodes)
-      outcome <- sociomatrix[l.diag(n.nodes)]
+      if (any(sociomatrix != t(sociomatrix))) {
+        edge.list <- make.arc.list (n.nodes)
+        outcome <- t(sociomatrix)[non.diag(n.nodes)]
+      } else {
+        edge.list <- make.edge.list (n.nodes)
+        outcome <- sociomatrix[l.diag(n.nodes)]
+      }
       if (is.null(colnames(sociomatrix))) node.names <- 1:n.nodes else node.names <- colnames(sociomatrix)
     }
 
@@ -649,14 +1055,34 @@ CID.Gibbs <- function (edge.list,
     } else {
       message ("Fitting: gaussian outcome.")
     }
-  
+
     CID.object <- CIDnetwork$new(edge.list, n.nodes=n.nodes, components=components, outcome=outcome,
                                  class.outcome=class.outcome, ordinal.count=ordinal.count,
                                  node.names=as.character(node.names))
-  } 
-    
-  res <- CID.object$gibbs.full(...)
-  DIC <- CID.object$DIC(res)
+  }else{
+      CID.object <- input
+      CID.object$components <- components
+      CID.object$reinitialize()
+
+  }
+
+  res <- CID.object$gibbs.full(draws=draws,burnin=burnin,thin=thin,...)
+
+
+}else{
+    CID.Gibbs.object <- input
+    CID.object <- CID.Gibbs.object$CID.object
+    res.2 <- CID.object$gibbs.full(draws=draws,burnin=burnin,thin=thin,...)
+
+    ##  Concatenating Chains
+    if(new.chain){
+        res <- res.2
+    }else{
+        res <- c(CID.Gibbs.object$results,res.2)
+    }
+}
+
+  DIC <- CID.object$DIC(res, add.parts=TRUE)
   #marg.ll <- CID.object$marginal.loglikelihood(res)
   #pseudo.CV.ll <- CID.object$pseudo.CV.loglikelihood(res)
 
@@ -664,60 +1090,31 @@ CID.Gibbs <- function (edge.list,
                  CID.object=CID.object,
                  DIC=DIC)
   class(output) <- "CID.Gibbs"
-  
+
   return(output) #,
    #           marg.ll=marg.ll,
    #           pseudo.CV.ll=pseudo.CV.ll))
-  
+
 }
 
 
 print.CID.Gibbs <- function (x, ...) {
-  x$CID.object$gibbs.summary (x$results, ...)
-  #x$CID.object$show(...)
+    #x$CID.object$gibbs.summary(x$results, ...)
+   x$CID.object$show(...)
 }
 
 summary.CID.Gibbs <- function (object, ...) {
-  object$CID.object$gibbs.summary (object$results, ...)
+  object$CID.object$gibbs.summary(object, ...)
+
 }
+
+print.summary.CID.Gibbs <- function(x, ...){
+    x$CID.object$print.gibbs.summary(x)
+}
+
 
 plot.CID.Gibbs <- function (x, ...) {
   x$CID.object$gibbs.plot (x$results, x$DIC, ...)
 }
 
-    
-network.plot <- function (x, fitted.values=FALSE, ...) {
 
-  if (class(x) == "CID.Gibbs") {
-
-    if (fitted.values) values <- apply(x$CID.object$gibbs.value(x$results), 1, mean) else values <- x$CID.object$outcome
-    x$CID.object$plot.network(values, ...)
-
-  }
-  
-}
-
-sociogram.plot <- function (x, component.color=0, ...) {
-
-  if (class(x) == "CID.Gibbs") {
-
-    #pull out the non-zero edge list.
-    edges <- x$CID.object$edge.list[x$CID.object$outcome > 0,]
-
-    vertexcolor <- rep("#DDDDFF", x$CID.object$n.nodes)
-    if (component.color > 0) {
-      if (component.color > length(x$CID.object$components)) stop ("Invalid component number for sociogram plot.")
-      
-      switched <- x$CID.object$gibbs.switcheroo(x$results)
-      vertexcolor <- x$CID.object$components[[component.color]]$gibbs.node.colors(switched[[component.color+4]])
-    
-    #weights <- x$outcome[x$outcome > 0]
-      plot(graph.edgelist(edges, directed=FALSE),
-           vertex.label=x$CID.object$node.names,
-           vertex.color=vertexcolor,
-           ...)
-    
-    }
-  
-  }
-}

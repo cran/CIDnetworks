@@ -21,14 +21,14 @@ LVMcid <-
       latent.vector.pos.P="matrix",
       #latent.vector.tune="numeric",
       
-                     #inherited from main. Must fix later, but OK for now.
+      ##inherited from main. Must fix later, but OK for now.
 
       node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
       residual.variance="numeric",
-      sr.rows="list"    #,
+      edge.list.rows="list"    #,
       
       ),
     
@@ -40,7 +40,7 @@ LVMcid <-
         
         n.nodes=10,
         edge.list=make.edge.list(n.nodes),
-        sr.rows=row.list.maker(edge.list),
+        edge.list.rows=row.list.maker(edge.list),
         residual.variance=1,
         outcome=numeric(0),
         
@@ -59,7 +59,7 @@ LVMcid <-
         
         .self$n.nodes <<- n.nodes
         .self$edge.list <<- edge.list
-        .self$sr.rows <<- sr.rows
+        .self$edge.list.rows <<- edge.list.rows
         .self$residual.variance <<- residual.variance
         .self$node.names <<- as.character(1:.self$n.nodes)
                 
@@ -91,7 +91,7 @@ LVMcid <-
         if (!is.null(n.nodes)) n.nodes <<- n.nodes  #.self$
         if (!is.null(edge.list)) {
           edge.list <<- edge.list
-          sr.rows <<- row.list.maker(edge.list)
+          edge.list.rows <<- row.list.maker(edge.list)
         }
         if (nrow(latent.vector.pos) != .self$n.nodes) {
           message ("Reinitializing LVM Vectors")
@@ -117,7 +117,7 @@ LVMcid <-
         latent.space.plot (pos, arrowlines=TRUE, labels=node.names, ...)
       },
       plot.network = function (color=outcome, ...) {
-        netplot (edge.list, color, node.labels=node.names, ...)
+        image.netplot (edge.list, color, node.labels=node.names, ...)
       },
       
       
@@ -141,7 +141,7 @@ LVMcid <-
       },
       
       draw = function (verbose=0) {  # tune=latent.vector.tune
-      #d1 <- LSMcid$new(); latent.vector.pos <- d1$latent.vector.pos; mult.factor <- d1$mult.factor; edge.list <- d1$edge.list; sr.rows <- d1$sr.rows; n.nodes <- d1$n.nodes; mult.factor.m=0; mult.factor.v=10000; latent.vector.tune=0.1
+      #d1 <- LSMcid$new(); latent.vector.pos <- d1$latent.vector.pos; mult.factor <- d1$mult.factor; edge.list <- d1$edge.list; edge.list.rows <- d1$edge.list.rows; n.nodes <- d1$n.nodes; mult.factor.m=0; mult.factor.v=10000; latent.vector.tune=0.1
 
         lsdim <- dim(latent.vector.pos)[2]
         latent.vector.pos.hold <- latent.vector.pos

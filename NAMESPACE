@@ -1,17 +1,44 @@
 useDynLib(CIDnetworks)
-importFrom(Rcpp, evalCpp)   
+importFrom(Rcpp, evalCpp)
 importFrom(msm, rtnorm)
 importFrom(mvtnorm, rmvnorm)
+importFrom(mvtnorm, dmvnorm)
+importFrom(mvtnorm, pmvnorm)
+importFrom(pbivnorm, pbivnorm)
 importFrom("methods", show)
 importFrom(igraph, graph.edgelist)
 importFrom(igraph, plot.igraph)
+importFrom(numDeriv, grad)
+importFrom(numDeriv, hessian)
+
 #exportMethods()
 
 #exportPattern("^[[:alpha:]]+")
 export (CID, CID.Gibbs, CID.generate, CIDnetwork,
-        COV,HBM,LSM,LVM,MMSBM,SBM,SR,
-        unwrap.CID.Gibbs,  network.plot, sociogram.plot)
+        COV,HBM,LSM,LVM,MMSBM,SBM,SR,BETA,
+        
+        unwrap.CID.Gibbs,
+
+        #list.output.to.matrices,
+
+        likelihood.plot,
+        intercept.plot,
+        COV.plot,
+        LSM.plot,
+        SBM.plot,
+        MMSBM.plot,
+        SR.plot,
+
+        network.plot, sociogram.plot,
+
+        n.nodes,edge.list,is.net.directed,net.density,
+        outcome,node.names,
+        inDegree,outDegree,socio,value.mat,
+        switcheroo,mat.cov.to.edge.list.cov, ##  add mans for these
+
+        l.diag, u.diag, ordinal.maker)
 
 S3method (plot, CID.Gibbs)
 S3method (print, CID.Gibbs)
 S3method (summary, CID.Gibbs)
+S3method (print, summary.CID.Gibbs)
