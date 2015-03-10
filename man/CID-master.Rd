@@ -9,7 +9,7 @@
 }
 \usage{
 
-  CID (input, outcome, n.nodes, intercept = 0,components,
+  CID (input, outcome, n.nodes, node.names, intercept = 0,components,
   class.outcome="ordinal", fill.in.missing.edges=missing(outcome),
   generate=FALSE, verbose=2, ...)
   CID.generate (...)
@@ -27,6 +27,7 @@
     represent observed edges in a binary network.  outcome requires no
     value is a sociomatrix is provided.}
   \item{n.nodes}{Number of nodes in generated networks}
+  \item{node.names}{Names labeling each node in the network.}
   \item{intercept}{Intercept to be used when generating new networks}
   \item{components}{A list of components to use when generating new
     networks.  Possible components include SR, SBM, MMSBM, LSM, LVM HBM

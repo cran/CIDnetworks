@@ -141,7 +141,7 @@ SBMcid <-
           message ("Reinitializing SBM Memberships")
           membership <<- sample(n.groups, n.nodes, replace=TRUE)
         }
-        if(dim(membership.a) != c(n.nodes,n.groups)){
+        if(!identical(dim(membership.a), c(n.nodes,n.groups))){
           membership.a <<- matrix(1, nrow=n.nodes, ncol=n.groups)
         }
 

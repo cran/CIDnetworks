@@ -7,7 +7,7 @@
 
 # image plot for a network.
 image.netplot <- function (edge.list, outcome,
-                     extremes=range(outcome),
+                     extremes=range(outcome,na.rm=TRUE),
                      colvalues=10,
                      col1="white", col2="black",
                      null.color="#DDDDFF",
@@ -32,7 +32,7 @@ image.netplot <- function (edge.list, outcome,
   plot(c(-1, n.nodes), c(-1, n.nodes), ty="n", axes=FALSE, xlab="Receivers", ylab="Senders", ...)
   rect(0, 0, n.nodes, n.nodes, col=null.color)
   colseq <- colpalette(colvalues)[as.numeric(cut(outcome, breaks=seq(min(extremes), max(extremes), length=colvalues+1), include.lowest=TRUE))]
-
+  colseq[is.na(colseq)] <- "pink"
   f.order <- rep(NA,length(node.order))
   for(ii in 1:length(node.order)){
       f.order[node.order[ii]] <- ii
@@ -49,7 +49,7 @@ image.netplot <- function (edge.list, outcome,
        reordered.edge.list[,2], reordered.edge.list[,1], col=colseq, lwd=lwd)
   if (symmetric) rect(reordered.edge.list[,1]-1, reordered.edge.list[,2]-1,
                       reordered.edge.list[,1], reordered.edge.list[,2], col=colseq, lwd=lwd)
-  
+
   text(1:n.nodes - 0.5, rep(-0.5, length(n.nodes)), node.labels[node.order], cex=label.cex)
   text(rep(0, length(n.nodes)), 1:n.nodes - 0.5, node.labels[node.order], cex=label.cex, pos=2)
 
@@ -198,7 +198,7 @@ dotchart.coef <- function (values,
         ypts+0.5,
         names,
         cex=2/sqrt(length(values)))  #added 6-25-14.
-  
+
   if (!is.null(sd)) {
     if (length(sd) != length(values)) stop ("Length of SD vector does not match length of values.")
     segments(values-2*sd, ypts, values+2*sd, col=2, lwd=3)

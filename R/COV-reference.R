@@ -20,6 +20,7 @@ COVARIATEcid <-
       cov.block="matrix",
 
       node.names="character",
+      cov.node.names="character",
       n.nodes="numeric",
       outcome="numeric",
       edge.list="matrix",
@@ -46,7 +47,7 @@ COVARIATEcid <-
         coef.cov.m=0, #ncol(covariates)),
         coef.cov.V=diag(1000000, 1), #rep(ncol(covariates), 2)),
 
-        cov.type="nothing",
+        cov.type=c("Edge","Sender","Receiver","SendRec","Identical"),
         center=TRUE,
 
 
@@ -59,12 +60,47 @@ COVARIATEcid <-
         .self$residual.variance <<- residual.variance
         .self$node.names <<- as.character(1:.self$n.nodes)
         .self$center <<- center
+        .self$cov.type <<- match.arg(cov.type)
+        .self$cov.node.names <<- as.character(NA)
 
         #handle covariates.
-        if (!(class(covariates) %in% c("array", "matrix"))) stop ("COV: Covariates must be a matrix or array object.")
+        cov.arg <- covariates
+        ##        if(cov.type == "Edge"){
+        if (!(class(cov.arg) %in% c("array", "matrix","data.frame","numeric"))) stop ("COV: Covariates must be a matrix, array or data.frame object.")
 
-        .self$covariates <<- as.array(covariates)
-        if (nrow(covariates) == ncol(covariates)) {
+        if(class(cov.arg) %in% c("array","matrix","numeric")){
+          if(!is(cov.arg,"array")){ #if given a vector, convert to column
+            cov.arg <- as.matrix(cov.arg)
+          }
+          if(cov.type != "Edge"){
+            if(!is.null(rownames(cov.arg)))
+              .self$cov.node.names <<- rownames(cov.arg)
+          }
+        }else{
+          if(cov.type != "Edge"){
+            if(!is.numeric(cov.arg[,1])){
+              if(ncol(cov.arg) > 1){
+                .self$cov.node.names <<- as.character(cov.arg[,1])
+                cov.arg <- cov.arg[,-1]
+              }else{
+                stop("COV:  Covariates must have at least one numeric column")
+              }
+            }else{
+              if(!is.null(rownames(cov.arg))){
+                message("COV:  Assuming rownames correspond to node names")
+                .self$cov.node.names <<- rownames(cov.arg)
+              }
+            }
+          }
+          cov.arg <- as.matrix(cov.arg)
+          if(!is.numeric(cov.arg))
+            stop("COV:  Covariates must be numeric")
+        }
+
+
+        .self$covariates <<- cov.arg
+        rm(covariates)  #  removing the passed version of covariates
+        if (nrow(covariates) == ncol(covariates)) { #If matrix form covariates
           if (length(dim(covariates)) != 3) covariates <<- array (covariates, c(dim(covariates), 1))
           temp.dim <- dim(covariates)[3]
           temp.names <- dimnames(covariates)[[3]]
@@ -96,7 +132,6 @@ COVARIATEcid <-
         #.self$cov.block <<- t(covariates)%*%covariates
 
         .self$coef.cov.P <<- solve(.self$coef.cov.V)
-        .self$cov.type <<- cov.type
 
         if (generate) .self$generate() else .self$outcome <<- outcome
 
@@ -108,29 +143,42 @@ COVARIATEcid <-
           edge.list <<- edge.list
           edge.list.rows <<- row.list.maker(edge.list)
         }
+        if (!is.null(node.names) & length(node.names) == .self$n.nodes) {
+          node.names <<- node.names
+        }else
+          node.names <<- as.character(1:.self$n.nodes)
 
 
         if (cov.type == "Edge") {
 
           if (nrow(covariates) == n.nodes & ncol(covariates) == n.nodes) {
             message("Detected a sociomatrix-style covariate array. Adjusting to match the edge list.")
-            covariates <<- mat.cov.to.edge.list.cov (covariates, arc.list=edge.list)
+            covariates <<- as.matrix(mat.cov.to.edge.list.cov (covariates, arc.list=edge.list))
           }
 
+        }else{
+
+          if(!any(is.na(cov.node.names))) {
+            names.match <- match(node.names,cov.node.names)
+            if(!any(is.na(names.match))){
+              covariates <<- covariates[names.match,,drop=FALSE]
+            }else{
+              message("COV:  node.names for covariates don't match those for edge.list.  Inaccurate coefficients may result")
+            }
+          }
+
+          if (cov.type == "Sender")
+            covariates <<- covariates[edge.list[,1],,drop=FALSE]
+
+          if (cov.type == "Receiver")
+            covariates <<- covariates[edge.list[,2],,drop=FALSE]
+
+          if (cov.type == "SendRec")
+            covariates <<- covariates[edge.list[,1],,drop=FALSE] + covariates[edge.list[,2],,drop=FALSE]
+
+          if (cov.type == "Identical")
+            covariates <<- 1*(covariates[edge.list[,1],,drop=FALSE] == covariates[edge.list[,2],,drop=FALSE])
         }
-
-        if (cov.type == "Sender")
-          covariates <<- covariates[edge.list[,1],,drop=FALSE]
-
-        if (cov.type == "Receiver")
-          covariates <<- covariates[edge.list[,2],,drop=FALSE]
-
-        if (cov.type == "SendRec")
-          covariates <<- covariates[edge.list[,1],,drop=FALSE] + covariates[edge.list[,2],,drop=FALSE]
-
-        if (cov.type == "Identical")
-          covariates <<- 1*(covariates[edge.list[,1],,drop=FALSE] == covariates[edge.list[,2],,drop=FALSE])
-
 
         #Now, we can correct! Check dimensions of covariate matrix against edge list.
 
@@ -140,15 +188,12 @@ COVARIATEcid <-
         if (nrow(covariates) > nrow(edge.list)) {
           stop (paste0("The number of rows in the COV matrix, ",nrow(covariates)," is greater than the number of edges, ",nrow(edge.list),"."))
         }
-        if (!is.null(node.names)) {
-          if (length(node.names) == .self$n.nodes) node.names <<- node.names
-        } else node.names <<- as.character(1:.self$n.nodes)
 
         ## .self$cov.block <<- t(covariates)%*%covariates
         if(center){
             covariates.new  <- t( t(covariates) - colMeans(covariates))
             if(!identical(covariates.new, covariates)){
-                message("Centering covariates to speed sampler.  Do disable centering pass center = FALSE")
+                message("Centering covariates to speed sampler.  To disable centering pass center = FALSE")
                 covariates <<- covariates.new
             }
 
@@ -228,7 +273,7 @@ COVARIATEcid <-
         return(ob1)
       },
       print.gibbs.summary = function (gibbs.sum) {
-        message ("Coefficients:")
+        message (cov.type," Coefficients:")
         print (gibbs.sum)
         return()
       },

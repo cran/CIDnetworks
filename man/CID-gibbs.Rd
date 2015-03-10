@@ -36,7 +36,7 @@
 
   CID.Gibbs (input,
              outcome,
-
+             node.names,
              components,
              class.outcome = NULL,
              fill.in.missing.edges = missing(outcome),
@@ -99,7 +99,7 @@
     sociomatrix.  Otherwise, an outcome value must be specified for each
     edge in the edgelist, and any edges not provided are assumed to have
     no data.}
-  
+  \item{node.names}{Names labeling each node in the network.}
   \item{CID.Gibbs.object}{If desired, an existing CID.Gibbs output object can be loaded
     instead of a new network specification.}
   

@@ -3,6 +3,9 @@
 \alias{c.elegans}
 \alias{dolphins}
 \alias{prison}
+\alias{Advice}
+\alias{edge.covariates}
+\alias{SR.covariates}
 
 \title{CIDnetworks: Included Data Sets}
 \description{
@@ -13,6 +16,7 @@
   c.elegans
   dolphins
   prison
+  Advice
 }
 \format{
   Lazega: A list including six sociomatrices (three directed, three
@@ -23,7 +27,14 @@
 
   dolphins: A symmetric sociomatrix.
   
-  prison: (Thanks to UCINET) In the 1950s John Gagnon collected sociometric choice data from 67 prison inmates. All were asked, "What fellows on the tier are you closest friends with?" Each was free to choose as few or as many "friends" as he desired. 
+  prison: (Thanks to UCINET) In the 1950s John Gagnon collected
+  sociometric choice data from 67 prison inmates. All were asked,
+  "What fellows on the tier are you closest friends with?" Each was free
+  to choose as few or as many "friends" as he desired. 
+
+  Advice: A set of teacher advice networks from 15 different schools.
+  Also includes edge.covariates which are covariates for each edge and
+  SR.covariates, which are covariates for each node.
   
 }
 \references{

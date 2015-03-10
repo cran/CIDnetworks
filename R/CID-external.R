@@ -45,7 +45,7 @@ net.density = function(object){
   if(class(object) == "CIDnetwork"){
     n = n.nodes(object)
     yy = outcome(object)
-    den = sum(yy)/((n)*(n-1))
+    den = sum(yy[!is.na(yy)])/((n)*(n-1)) #incase there are missing edges
     return(den)
   }else(stop("argument must be of CID.Gibbs or CIDnetwork class!"))
 }
@@ -218,7 +218,7 @@ sociogram.plot <- function (x, component.color=0, vertexcolor, add.labels=TRUE, 
   if(class(x) == "CIDnetwork"){
 
     ##pull out the greater-than-zero edge list.
-    edges <- x$edge.list[x$outcome > 0,]
+    edges <- x$edge.list[!is.na(x$outcome) & x$outcome > 0,]
 
     if(missing(vertexcolor)){
       if (component.color > length(x$components)) stop ("Invalid component number for sociogram plot.")
@@ -411,4 +411,45 @@ SR.plot = function(x, ...){
     plot(x, which.plot = ix, auto.layout = FALSE, ...)
   }else(stop("Wrong model specified"))
 }
+
+
+
+
+##Function for computing the posterioir mode of the positions
+#using 2dimensional KDE
+
+#1. Find np density.
+#2. Find the position (x,y) that maximize the density
+#required library(MASS)
+
+getModeLS = function(object,gridsize = 50){
+    if(!is(object,"CID.Gibbs")){
+        stop('Object should be of class CID.Gibbs')
+    }
+    switched = switcheroo(object)
+    if(is.null(switched$LSMout)){
+        stop('Wrong model specified')
+    }
+    draws = length(switched$LSMout)
+    dd = dim(switched$LSMout[[1]]$latent.space.pos)[2]
+    if(dd > 2){
+	warning("Current code finds posterior mode for 2-dimensional latent positions only")}
+    nn = n.nodes(object)
+    npmode = array(NA,dim=c(nn,dd))
+    for(ii in 1:nn){
+        XX = sapply(1:draws,function(y){
+            switched$LSMout[[y]]$latent.space.pos[ii,1]})
+        YY = sapply(1:draws,function(y){
+            switched$LSMout[[y]]$latent.space.pos[ii,2]})
+        npfit = kde2d(x=XX,y=YY, n = gridsize,
+                      lims = c(range(XX),range(YY)))
+        yind = sapply(1:gridsize,function(x){
+                which(npfit$z[x,]==max(npfit$z[x,]))})
+        xmax = sapply(1:gridsize,function(x) (npfit$z[x,yind[x]]))
+        xi = which(xmax == max(xmax))
+        npmode[ii,] = c(npfit$x[xi],npfit$y[yind[xi]])
+    }
+    return(npmode)
+}
+
 

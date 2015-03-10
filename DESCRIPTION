@@ -2,7 +2,7 @@ Package: CIDnetworks
 Type: Package
 Title: Generative Models for Complex Networks with Conditionally
         Independent Dyadic Structure
-Version: 0.8.0
+Version: 0.8.1
 Date: 2015-03-10
 Authors@R: c(person("Samrachana","Adhikari",role="aut"),
 	     person("Beau","Dabbs",email="bdabbs@andrew.cmu.edu",role=c("cre","aut")),
@@ -14,9 +14,9 @@ Description: Generative models for complex networks with conditionally independe
 License: GPL (> 3)
 Depends: R (>= 3.0.0)
 Imports: mvtnorm, msm, methods, Rcpp (>= 0.11.0), igraph, numDeriv,
-        pbivnorm
+        pbivnorm, MASS
 LinkingTo: Rcpp
-Packaged: 2015-03-11 18:14:41 UTC; Beau
+Packaged: 2015-04-07 21:39:23 UTC; Beau
 Author: Samrachana Adhikari [aut],
   Beau Dabbs [cre, aut],
   Brian Junker [aut],
@@ -26,4 +26,4 @@ Author: Samrachana Adhikari [aut],
 Maintainer: Beau Dabbs <bdabbs@andrew.cmu.edu>
 NeedsCompilation: yes
 Repository: CRAN
-Date/Publication: 2015-03-11 23:15:52
+Date/Publication: 2015-04-08 07:22:47

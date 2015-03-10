@@ -10,6 +10,7 @@ importFrom(igraph, graph.edgelist)
 importFrom(igraph, plot.igraph)
 importFrom(numDeriv, grad)
 importFrom(numDeriv, hessian)
+importFrom(MASS,kde2d)
 
 #exportMethods()
 

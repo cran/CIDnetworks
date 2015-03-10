@@ -184,10 +184,12 @@ CIDnetwork <-
                 message ("CIDnetwork: No reciprocal potential edges detected; assuming this is an undirected network.")
               .self$is.directed <<- FALSE
             }
-
-            .self$edge.list <<- edge.list
-            .self$outcome <<- outcome
+          }else{
+            .self$is.directed <<- is.directed
           }
+
+          .self$edge.list <<- edge.list
+          .self$outcome <<- outcome
         }
 
 
@@ -196,11 +198,13 @@ CIDnetwork <-
         else
           .self$edge.list.rows <<- row.list.maker(.self$edge.list)
 
-        if (length(node.names) != .self$n.nodes)
+        if (length(node.names) != .self$n.nodes){
+          if(verbose > 0)
+            message("Warning:  Length of node.names differs from n.nodes.  Using default node names")
           .self$node.names <<- as.character(1:.self$n.nodes)
-        else
+        }else{
           .self$node.names <<- node.names
-
+        }
         if (class.outcome == "binary") {
           .self$class.outcome <<- "ordinal"
           .self$ordinal.count <<- 2
@@ -228,9 +232,9 @@ CIDnetwork <-
           if (class(components) != "list") components.t <- list(components) else components.t <- components
           if(reinit){
             for (kk in 1:length(components.t)) {
-              components.t[[kk]]$reinitialize(.self$n.nodes,
-                                              .self$edge.list,
-                                              .self$node.names)
+              components.t[[kk]]$reinitialize(n.nodes=.self$n.nodes,
+                                              edge.list=.self$edge.list,
+                                              node.names=.self$node.names)
 
               if (class(components.t[[kk]]) %in% c("SBMcid", "MMSBMcid", "HBMcid")) {
                 .self$intercept.m <<- 0
@@ -239,6 +243,9 @@ CIDnetwork <-
             }
           }
           .self$components <<- components.t
+#          if(length(which(sapply(components ,class) == "COVARIATEcid")) >1){
+#            .self$components <- combine.covariates(components)
+#          }
         } else .self$components <- list()
 
         ##message("Component initialization complete.")
@@ -350,6 +357,10 @@ CIDnetwork <-
         }
 
       },
+#      combine.covariates <- function(components.arg){
+#        cov.ind <- which(sapply(components,class) == "COVARIATEcid")
+#
+#    },
       plot = function (coefs=coef.cov, names=1:length(coefs), sd=NULL, interval=NULL, ...) {
         if (length(components) > 0) for (cc in 1:length(components)) components[[cc]]$plot()
       },
@@ -986,17 +997,19 @@ CIDnetwork <-
 
         print.gibbs.summary = function(gibbs.sum){
 
-            message ("Intercept:"); print(gibbs.sum$intercept)
+            message ("Intercept:"); print(gibbs.sum$intercept[-(1:2)])
             if (gibbs.sum$residual.variance[4] != 0) {  #SD
 		message ("Residual variance:")
 		print (gibbs.sum$residual.variance)
             }
 
-            message ("Log likelihood:"); print(gibbs.sum$log.likelihood)
+            message ("Log likelihood:"); print(gibbs.sum$log.likelihood[-(1:2)])
 
-            if(!is.null(gibbs.sum$residual.variance)){
+            if(!is.null(gibbs.sum$residual.variance[-(1:2)])){
+              if(gibbs.sum$residual.variance["estimated.sd"] != 0){
                 message ("Residual variance:")
                 print (gibbs.sum$residual.variance)
+              }
             }
 
             if (class.outcome == "ordinal") if (ordinal.count > 2) {
@@ -1009,11 +1022,21 @@ CIDnetwork <-
                 print (gibbs.sum$ordinal.cutoffs)
             }
 
-            if (length(components) > 0) for (cc in 1:length(components)) {
-#		message ("Component ", class(components[[cc]]),":")
+            if (length(components) > 0){
+              cov.count <- 0
+              for (cc in 1:length(components)) {
+                ##		message ("Component ", class(components[[cc]]),":")
                 ix <- which(names(gibbs.sum) == class(components[[cc]]))
-                components[[cc]]$print.gibbs.summary(gibbs.sum[[ix]])
+                if(length(ix) > 1){
+                  cov.count <- cov.count + 1
+                  ix <- ix[cov.count]
+                }
+                for(ii in 1:length(ix)){
+                  components[[cc]]$print.gibbs.summary(gibbs.sum[[ix]])
+                }
+
 #		print(round(gibbs.sum$class(components[[cc]])),3)
+              }
             }
             return()#invisible(gibbs.sum))
         },
@@ -1131,14 +1154,16 @@ CID.generate <- function (...) CID (..., generate=TRUE)
 
 CID <- function (input,    # Must be edge.list, sociomatrix, CID.object or CID.Gibbs.object
                  outcome,  # Only used when input is an edge.list
-                 n.nodes,  # Only used if input is missing.
-                 intercept = 0,
+                 n.nodes,
+                 node.names,
+                 intercept = 0,# Only used if input is missing.
                  components,
                  class.outcome="ordinal",
                  fill.in.missing.edges=missing(outcome),
                  generate=FALSE,
                  verbose=2,
                  ...) {
+#  browser()
   if (missing(components)) components <- list()
 
   if (missing(input) & missing(n.nodes)) stop ("CID: no input was provided. Requires at least one of: sociomatrix, edge list, n.nodes.")
@@ -1165,11 +1190,43 @@ CID <- function (input,    # Must be edge.list, sociomatrix, CID.object or CID.G
         if (!missing(outcome)) outcome <- outcome[nonselfies]
       }
 
-      node.names <- unique(c(as.character(edge.list[,1]), as.character(edge.list[,2])))
+      node.names.tmp <- unique(c(as.character(edge.list[,1]), as.character(edge.list[,2])))
+      is.num.list <- FALSE
+      if(!missing(node.names)) {
+        if(length(node.names) >= length(node.names.tmp)){
+          if(any(is.na(match(node.names.tmp,node.names)))){ ##node names don't match
+            suppressWarnings(node.nums <- as.numeric(node.names.tmp))
+            is.num.list <- !any(is.na(node.nums))
+            if(!is.num.list){  ## If edge.list has non-numbers, use edge.list names
+              if(verbose > 0)
+                message("Warning:  edge.list contains nodes not named in node.names.")
+              node.names <- node.names.tmp
+            }else{
+              node.names.tmp <- as.character(sort(node.nums))  ##  sorting the node name numbers
+              if(max(node.nums) > length(node.names)){
+                if(verbose > 0)
+                  message("Warning:  edge.list contains node numbers larger than node.names vector.")
+                node.names <- node.names.tmp
+              }
+            }
+          }
+        }else{
+          if(verbose > 0)
+            message("Warning:  Length of node.names less than n.nodes.  Using default node names")
+          node.names <- node.names.tmp
+        }
+      }else{
+        node.names <- node.names.tmp
+      }
 
       n.nodes <- length(node.names)
-      numbered.edge.list <- cbind (match(edge.list[,1], node.names),
-                                   match(edge.list[,2], node.names))
+      if(is.num.list){
+        numbered.edge.list <- cbind(match(edge.list[,1], node.names.tmp),
+                                    match(edge.list[,2], node.names.tmp))
+      }else{
+        numbered.edge.list <- cbind(match(edge.list[,1], node.names),
+                                    match(edge.list[,2], node.names))
+      }
 
       if (missing(outcome) | fill.in.missing.edges) {
         if(verbose > 0){
@@ -1178,12 +1235,23 @@ CID <- function (input,    # Must be edge.list, sociomatrix, CID.object or CID.G
           else
             message("Filling in unspecified edges as zeroes.")
         }
-        new.edge.list <- make.edge.list (n.nodes)
+
+        ##  OLD CODE THAT ASSUMED UNDIRECTED NETWORK
+###        new.edge.list <- make.edge.list(n.nodes)
+###        rowmatch <- sapply (1:nrow(edge.list),
+###                            function(rr) min(which((numbered.edge.list[rr,1] == new.edge.list[,1] &
+###                                                    numbered.edge.list[rr,2] == new.edge.list[,2]) |
+###                                                   (numbered.edge.list[rr,2] == new.edge.list[,1] &
+###                                                    numbered.edge.list[rr,1] == new.edge.list[,2]))))
+
+        new.edge.list <- make.edge.list(n.nodes)
+        new.edge.list <- rbind(new.edge.list,new.edge.list[,2:1])
+        new.edge.list <- new.edge.list[order(new.edge.list[,1],new.edge.list[,2]),]
+
+
         rowmatch <- sapply (1:nrow(edge.list),
-                            function(rr) min(which((numbered.edge.list[rr,1] == new.edge.list[,1] &
-                                                    numbered.edge.list[rr,2] == new.edge.list[,2]) |
-                                                   (numbered.edge.list[rr,2] == new.edge.list[,1] &
-                                                    numbered.edge.list[rr,1] == new.edge.list[,2]))))
+                            function(rr) which((numbered.edge.list[rr,1] == new.edge.list[,1] &
+                                                numbered.edge.list[rr,2] == new.edge.list[,2])))
 
         rowmatch <- rowmatch[is.finite(rowmatch)]
 
@@ -1216,7 +1284,18 @@ CID <- function (input,    # Must be edge.list, sociomatrix, CID.object or CID.G
         edge.list <- make.edge.list (n.nodes)
         outcome <- sociomatrix[u.diag(n.nodes)]  #just to be clear.
       }
-      if (is.null(colnames(sociomatrix))) node.names <- 1:n.nodes else node.names <- colnames(sociomatrix)
+
+      ## Inferring Node Names
+      if(missing(node.names) || length(node.names) != ncol(sociomatrix)) {
+        if(!missing(node.names)){
+          if(verbose > 0) message("Warning: Length of node.names differs from nodes in sociomatrix.  Using default node.names")
+        }
+        if(!is.null(colnames(sociomatrix))){
+          node.names <- colnames(sociomatrix)
+        }else{
+          node.names <- 1:n.nodes
+        }
+      }
     }
 
     ordinal.count <- max(outcome,na.rm=TRUE)+1
@@ -1256,6 +1335,7 @@ CID <- function (input,    # Must be edge.list, sociomatrix, CID.object or CID.G
 CID.Gibbs <- function (input, # Must be edge.list, sociomatrix, CID.object or
                               # CID.Gibbs.object
                        outcome, # Only used when input is an edge.list
+                       node.names,
                        ##edge.list,
                        ##outcome,
                        ##sociomatrix,
@@ -1290,6 +1370,7 @@ CID.Gibbs <- function (input, # Must be edge.list, sociomatrix, CID.object or
                          outcome,
                          components=components,
                          class.outcome,
+                         node.names=node.names,
                          fill.in.missing.edges=fill.in.missing.edges,
                          verbose=verbose, ...)
     } else {
