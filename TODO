@@ -1,5 +1,37 @@
 Things to add:
 
+List from UVA workshop:
+
+1) Better handling of covariates. functions for edges, sender, receiver, "homophily"
+/differences, Crystal's model.
+-note that the re-numbering of nodes might make this trickier; maybe a node names term would help here.
+	-better matching of node names to node properties.
+
+2) EM modes for each solution (conditional maximization). Trickiest for LSM.
+
+3) Re-adaptation of LSM to use marginal likelihood.
+
+4) network image plot: get the correct bounds between 0 and 1 to properly display densities. (0 to 0.3 -- this might be AT's fault from an earlier draft.)
+
+5) Shrinkage terms away from ultra-small block sizes?
+
+6) Consider WAIC?
+
+7) Warning: using asymmetric components for symmetric data.
+
+
+
+
+Extra, 7-2-14
+
+8) Forcing SBM to have the requisite number of blocks.
+
+9) Postprocess LSM for quick-fit restoration to get means. Procrustes too.
+
+10) Trace plots for covariates "trace=TRUE" in COV.plot
+
+
+
 
 -names for each node in each mode. We need a guide for this! (Note: AT doesn't remember what he meant by "guide")
 
@@ -12,8 +44,6 @@ Things to add:
 -full demos for each of the other data sets.
 
 -more data sets!
-
-
 
 
 
@@ -60,24 +90,13 @@ round the estimated remaining time to nearest minute or hours....
 
 Beau's List:
 
-1) Add draws, burnin, etc. to arguments in CID.Gibbs. ## default: draws = 100, burnin -1, thinin = 10 # Done!
-
-2) Call CID.Gibbs on a CID.Object, while changing the components. ##fixed: using reinitialize and updating components of CID.object
-
-3) Call on CID.Gibbs object to extend the chain. ##Almost done. Need to add drop = TRUE argument.  How do we handle differing burnin/thin values?  Default to burnin 0 and same thin value?  Default thin to 1?
 
 4) Discard all -Inf burn-ins, regardless.
 4a) Identify what's contributing to the -Inf. Is it pnorm(Z)? If so, why so bad? Also if so, can we substitute for a fake "-Inf" value?
 
-5) Add nodal covariate methods. Add this to COV class?
-
 6) Print warning if list of components is 0? 
 
-7)Change input format so that there is a bultin checking for the class or type of the input. 
-
 8)Switcheroo default
-
-9) Write a check for class and type of input.
 
 10) Code crashes when there is NAs on the diagonal of the covariates. 
 
@@ -90,6 +109,27 @@ Done!
 
 -plot for asymmetric block matrix in SBM.
 
+1) Add draws, burnin, etc. to arguments in CID.Gibbs. ## default: draws = 100, burnin -1, thinin = 10 # Done!
+
+2) Call CID.Gibbs on a CID.Object, while changing the components. ##fixed: using reinitialize and updating components of CID.object
+
+3) Call on CID.Gibbs object to extend the chain. ##Almost done. Need to add drop = TRUE argument.  How do we handle differing burnin/thin values?  Default to burnin 0 and same thin value?  Default thin to 1?
+
+5) Add nodal covariate methods. Add this to COV class?
+
+7)Change input format so that there is a bultin checking for the class or type of the input. 
+
+9) Write a check for class and type of input.
+
+
+
+
+Done by ACT, 6-25-14:
+
+-fixed image network.plot flip, added x-y labels to indicate sender and receiver.
+-moved covariate labels to center of plot.
+-moved CID.Gibbs cleanup functions to new CID().
+-fixed intercept-to-zero omission in reinitialize.
 
 
 

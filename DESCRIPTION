@@ -1,18 +1,29 @@
 Package: CIDnetworks
 Type: Package
-Title: Generative models for complex networks with conditionally
-        independent dyadic structure
-Version: 0.6.0
-Date: 2014-06-18
-Author: Beau Dabbs, Brian Junker, Mauricio Sadinle, Tracy Sweet, A.C. Thomas 
-Maintainer: A.C. Thomas <act@acthomas.ca>
+Title: Generative Models for Complex Networks with Conditionally
+        Independent Dyadic Structure
+Version: 0.8.0
+Date: 2015-03-10
+Authors@R: c(person("Samrachana","Adhikari",role="aut"),
+	     person("Beau","Dabbs",email="bdabbs@andrew.cmu.edu",role=c("cre","aut")),
+	     person("Brian","Junker",role="aut"),
+	     person("Mauricio","Sadinle",role="aut"),
+	     person("Tracy","Sweet",role="aut"),
+	     person("A.C.","Thomas",role="aut"))
 Description: Generative models for complex networks with conditionally independent dyadic structure. Now supports directed arcs!
 License: GPL (> 3)
 Depends: R (>= 3.0.0)
 Imports: mvtnorm, msm, methods, Rcpp (>= 0.11.0), igraph, numDeriv,
         pbivnorm
 LinkingTo: Rcpp
-Packaged: 2014-06-18 22:17:23 UTC; acthomas
+Packaged: 2015-03-11 18:14:41 UTC; Beau
+Author: Samrachana Adhikari [aut],
+  Beau Dabbs [cre, aut],
+  Brian Junker [aut],
+  Mauricio Sadinle [aut],
+  Tracy Sweet [aut],
+  A.C. Thomas [aut]
+Maintainer: Beau Dabbs <bdabbs@andrew.cmu.edu>
 NeedsCompilation: yes
 Repository: CRAN
-Date/Publication: 2014-06-19 01:18:59
+Date/Publication: 2015-03-11 23:15:52

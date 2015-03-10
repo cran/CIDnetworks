@@ -23,6 +23,7 @@
 \alias{outDegree}
 \alias{socio}
 \alias{value.mat}
+\alias{value.mat.mean}
 \alias{switcheroo}
 
 
@@ -36,14 +37,19 @@
   CID.Gibbs (input,
              outcome,
 
-             components = list(),
+             components,
              class.outcome = NULL,
              fill.in.missing.edges = missing(outcome),
              new.chain = FALSE,
 
              draws = 100,
              burnin = -1,
-             thin = 10,            
+             thin = 10,
+             report = 100,
+             auto.converge = FALSE,
+             extend.max=10,
+             extend.count=100,
+             verbose=2,
              ...)
 
   \method{print}{CID.Gibbs} (x, \dots)
@@ -52,15 +58,15 @@
   \method{print}{summary.CID.Gibbs} (x, \dots)
 
   likelihood.plot(x, ...)
-  intercept.plot(x, trace = FALSE, ...)
-  COV.plot(x, ...)
+  intercept.plot(x, mode = c("standard","trace"), ...)
+  COV.plot(x, mode = c("standard","trace","scatterplot"), ...)
   LSM.plot(x, ...)
   SBM.plot(x, ...)
   MMSBM.plot(x, ...)
   SR.plot(x, ...)
 
   network.plot (x, fitted.values=FALSE, ...)
-  sociogram.plot (x, component.color=0, vertexcolor, ...)
+  sociogram.plot (x, component.color=0, vertexcolor, add.labels = TRUE, ...)
 
   n.nodes(object)
   edge.list(object)
@@ -72,6 +78,7 @@
   outDegree(object)
   socio(object)
   value.mat(CID.Gibbs.object, prob = TRUE)
+  value.mat.mean(object, prob = TRUE)
   switcheroo(CID.Gibbs.object)  
  
   
@@ -112,18 +119,29 @@
   \item{burnin}{Number of draws to burnin.  A negative value will
     automatically determine burnin amount.}
   \item{thin}{Amount of draws to thin the chain by.}
-    
+  \item{report}{Number of draws between reporting total draws so far.}
+  \item{auto.converge}{When true, a Geweke convergence test on
+    log-likleihood to detect convergence.}
+  \item{extend.max}{Maximum number of times chain will be extended until
+    it returns without converging.}
+  \item{extend.count}{Number of draws to extend chain by if convergence
+    test fails}
+  \item{verbose}{Level of output to be displayed while running.  A value
+    of 0 will return little or no output.  A value of 1 will only notify
+    of warnings of misuse.  A value of 2 will report progress of MCMC
+    chain.  A value of 3 or higher will report debugging values.}
   
   \item{...}{Further arguments to be passed to the Gibbs sampler
     routine or the plot routine. See details for more.}
   
   \item{x, object}{An object outputted from CID.Gibbs.}
+  \item{mode}{Controls which diagnostic plot is made.}
   \item{fitted.values}{If TRUE, plots the fitted tie strength under the
     Gibbs sampler. If FALSE, plots the network outcomes as entered.}
   \item{component.color}{If non-zero, colors the nodes in the sociogram
     according to the output of the Gibbs sampler.}
   \item{vertexcolor}{User-passed vertex colors for sociogram.plot .}
-
+  \item{add.labels}{When true, node labels are included on nodes.}
 	\item{trace}{If selected, displays the Gibbs sampler trace plot for
 	the intercept rather than a point and interval.}
 	\item{prob}{In value.mat, converts the linear predictor value to the

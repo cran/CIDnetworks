@@ -1,8 +1,12 @@
 \name{CIDnetworks-classes}
 \alias{BETA}
 \alias{BETAcid}
-\alias{COV}
-\alias{COVcid}
+\alias{EdgeCOV}
+\alias{SenderCOV}
+\alias{ReceiverCOV}
+\alias{SendRecCOV}
+\alias{IdenticalCOV}
+\alias{COVARIATEcid}
 \alias{HBM}
 \alias{HBMcid}
 \alias{LSM}
@@ -23,7 +27,11 @@
 \usage{
 
   BETA(...)
-  COV (...)
+  EdgeCOV (..., cov.type="Edge")
+  SenderCOV (...)
+  ReceiverCOV (...)
+  SendRecCOV (...)
+  IdenticalCOV (...)
   HBM (...)
   LSM (...)
   LVM (...)
@@ -35,6 +43,8 @@
 \arguments{
 
   \item{...}{Arguments passed to the respective classes.}
+  \item{cov.type}{Specifies the type of covariate effect.  Edge
+  specifies Edge-level covariate effects.}
     
 }
 \details{
@@ -45,7 +55,21 @@
 
   BETA: required: (nothing). Parameters: intercept.sr.
   
-  COV: required: covariates (matrix). Parameters: Corresponding coefficient vector coef.cov.
+  EdgeCOV: required: covariates (matrix). Parameters: Corresponding
+  coefficient vector coef.cov.
+
+  SenderCOV:  required: covariates (vector of length n.nodes).
+              Parameters: Corresponding coefficient vector coef.cov.
+
+  ReceiverCOV:  required: covariates (vector of length n.nodes).
+                Parameters: Corresponding coefficient vector coef.cov.
+
+  SendRecCOV:  required: covariates (vector of length n.nodes).
+               Parameters: Corresponding coefficient vector coef.cov.
+
+  IdenticalCOV:  required: covariates (vector of length n.nodes).
+                 Parameters: Corresponding coefficient vector coef.cov.
+	       
 
   HBM: required: n.groups (single value). Parameters: block.value,
   membership (for nodes to blocks), tree.parent (for blocks).

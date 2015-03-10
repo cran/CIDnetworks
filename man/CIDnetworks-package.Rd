@@ -15,15 +15,15 @@ structure.
 \tabular{ll}{
 Package: \tab CIDnetworks\cr
 Type: \tab Package\cr
-Version: \tab 0.6.0\cr
-Date: \tab 2014-06-18\cr
+Version: \tab 0.8.0\cr
+Date: \tab 2014-03-10\cr
 License: \tab GPLv3\cr
 }
 
 }
 \author{
 Beau Dabbs, Brian Junker, Mauricio Sadinle, Tracy Sweet, A.C. Thomas 
-Maintainer: A.C. Thomas <act@acthomas.ca>
+Maintainer: Beau Dabbs <bdabbs@andrew.cmu.edu>
 }
 
 \keyword{ package }

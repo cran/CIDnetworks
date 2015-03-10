@@ -162,40 +162,49 @@ list.output.to.matrices <- function (gibbs.out) {
 #postprocess.latent.positions is now more general than one particular family.
 
 #Rotate LSM positions so that nth point lies in the 1:nth dimensional subspace.
-postprocess.latent.positions <- function (latent.space.coords, recenter=TRUE) {
+postprocess.latent.positions <- function (latent.space.coords, latent.space.target,recenter=TRUE) {
   #latent.space.coords=latent.space.pos
 
   #recenter data.
-  if (recenter) latent.space.coords <- t(t(latent.space.coords)-apply(latent.space.coords,2,mean))
+  if (recenter){
+    latent.space.coords <- t(t(latent.space.coords)-apply(latent.space.coords,2,mean))
+    latent.space.target <- t(t(latent.space.target)-apply(latent.space.target,2,mean))
+	}
+  
+  projection = t(latent.space.target)%*% latent.space.coords;
+  ssZ = svd(projection)
+  transformation = ssZ$v%*%t(ssZ$u)
+  latent.space.coords = latent.space.coords%*%transformation
+  
   
   #rotate the nth position to the nth axis in plane for each.
 
-  rot.mat <- function (lsp.row, pinned.d=1) {
-    #lsp.row=latent.space.pos[1,]; pinned.d=1
-    rot.out <- diag(1, length(lsp.row))
-    for (dd in (length(lsp.row):(pinned.d+1))) {
-      d1 <- dd-1; d2 <- dd
-      rot <- diag(1, length(lsp.row))
-      ss <- sqrt(sum(lsp.row[c(d1,d2)]^2))
-      rot[d1,d1] <- rot[d2,d2] <- lsp.row[d1]/ss
-      rot[d1,d2] <- -lsp.row[d2]/ss
-      rot[d2,d1] <- lsp.row[d2]/ss
-      lsp.row <- lsp.row%*%rot
-      rot.out <- rot.out%*%rot
-    }
-    return(rot.out)
-  }
-
-  if (dim(latent.space.coords)[2] > 1) {
-    for (kk in 1:(dim(latent.space.coords)[2]-1)) {   #rotate into primary (hyper)plane.
-      latent.space.coords <-
-        latent.space.coords%*%rot.mat(latent.space.coords[kk,], kk)
-    }
-    for (kk in 2:dim(latent.space.coords)[2]) {
-      latent.space.coords[,kk] <-
-        latent.space.coords[,kk]*(1*(latent.space.coords[kk,kk] >= 0) - 1*(latent.space.coords[kk,kk] < 0))
-    }
-  }
+#   rot.mat <- function (lsp.row, pinned.d=1) {
+#     #lsp.row=latent.space.pos[1,]; pinned.d=1
+#     rot.out <- diag(1, length(lsp.row))
+#     for (dd in (length(lsp.row):(pinned.d+1))) {
+#       d1 <- dd-1; d2 <- dd
+#       rot <- diag(1, length(lsp.row))
+#       ss <- sqrt(sum(lsp.row[c(d1,d2)]^2))
+#       rot[d1,d1] <- rot[d2,d2] <- lsp.row[d1]/ss
+#       rot[d1,d2] <- -lsp.row[d2]/ss
+#       rot[d2,d1] <- lsp.row[d2]/ss
+#       lsp.row <- lsp.row%*%rot
+#       rot.out <- rot.out%*%rot
+#     }
+#     return(rot.out)
+#   }
+# 
+#   if (dim(latent.space.coords)[2] > 1) {
+#     for (kk in 1:(dim(latent.space.coords)[2]-1)) {   #rotate into primary (hyper)plane.
+#       latent.space.coords <-
+#         latent.space.coords%*%rot.mat(latent.space.coords[kk,], kk)
+#     }
+#     for (kk in 2:dim(latent.space.coords)[2]) {
+#       latent.space.coords[,kk] <-
+#         latent.space.coords[,kk]*(1*(latent.space.coords[kk,kk] >= 0) - 1*(latent.space.coords[kk,kk] < 0))
+#     }
+#   }
   
   return(latent.space.coords)
 }

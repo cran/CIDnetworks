@@ -29,7 +29,7 @@ image.netplot <- function (edge.list, outcome,
   ## is there any overlap? If not, symmetric plot.
   symmetric <- (nrow(val2) == 2*nrow(val1))
 
-  plot(c(-1, n.nodes), c(-1, n.nodes), ty="n", axes=FALSE, xlab="", ylab="", ...)
+  plot(c(-1, n.nodes), c(-1, n.nodes), ty="n", axes=FALSE, xlab="Receivers", ylab="Senders", ...)
   rect(0, 0, n.nodes, n.nodes, col=null.color)
   colseq <- colpalette(colvalues)[as.numeric(cut(outcome, breaks=seq(min(extremes), max(extremes), length=colvalues+1), include.lowest=TRUE))]
 
@@ -40,11 +40,16 @@ image.netplot <- function (edge.list, outcome,
   node.order <- f.order
   reordered.edge.list <- array(node.order[edge.list], dim(edge.list))
 
-  rect(reordered.edge.list[,1]-1, reordered.edge.list[,2]-1,
-       reordered.edge.list[,1], reordered.edge.list[,2], col=colseq, lwd=lwd)
-  if (symmetric) rect(reordered.edge.list[,2]-1, reordered.edge.list[,1]-1,
-                      reordered.edge.list[,2], reordered.edge.list[,1], col=colseq, lwd=lwd)
+  #rect(reordered.edge.list[,1]-1, reordered.edge.list[,2]-1,
+  #     reordered.edge.list[,1], reordered.edge.list[,2], col=colseq, lwd=lwd)
+  #if (symmetric) rect(reordered.edge.list[,2]-1, reordered.edge.list[,1]-1,
+  #                    reordered.edge.list[,2], reordered.edge.list[,1], col=colseq, lwd=lwd)
 
+  rect(reordered.edge.list[,2]-1, reordered.edge.list[,1]-1,
+       reordered.edge.list[,2], reordered.edge.list[,1], col=colseq, lwd=lwd)
+  if (symmetric) rect(reordered.edge.list[,1]-1, reordered.edge.list[,2]-1,
+                      reordered.edge.list[,1], reordered.edge.list[,2], col=colseq, lwd=lwd)
+  
   text(1:n.nodes - 0.5, rep(-0.5, length(n.nodes)), node.labels[node.order], cex=label.cex)
   text(rep(0, length(n.nodes)), 1:n.nodes - 0.5, node.labels[node.order], cex=label.cex, pos=2)
 
@@ -184,11 +189,16 @@ dotchart.coef <- function (values,
   plot (range(c(xlims, 0)), c(-length(values)-0.5, -0.5), ty="n", axes=FALSE, xlab="Value", ylab="Covariate", main=main, ...)
   box()
   axis(1)
-  axis(2, ypts, names, las=2, cex.axis=3/sqrt(length(values)))
+  axis(2, ypts, names, las=2) #, cex.axis=3/sqrt(length(values)))
   abline (h=ypts, col=8, lty=3)
   abline (v=0)
 
   points (values, ypts, pch=19, col=2, cex=2)
+  text (rep(mean(range(c(xlims, 0))), length(values)),
+        ypts+0.5,
+        names,
+        cex=2/sqrt(length(values)))  #added 6-25-14.
+  
   if (!is.null(sd)) {
     if (length(sd) != length(values)) stop ("Length of SD vector does not match length of values.")
     segments(values-2*sd, ypts, values+2*sd, col=2, lwd=3)

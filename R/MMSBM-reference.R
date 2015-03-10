@@ -13,21 +13,28 @@ draw.MMSB.from.nodes <- function (edge.list, node.block) {
 }
 
 MMSBMcid <-
-  setRefClass(
+    setRefClass(
     "MMSBMcid",
-    fields = list(
-      n.groups="numeric",
-      b.vector="numeric",
-      b.vector.m="numeric",
-      b.vector.v="numeric",
+        fields = list(
+            n.groups="numeric",
 
-      membership.edge="matrix",   #looks like edge list: has the membership number of each participant.
-      membership.node="matrix",   #each column is the Dirichlet distribution for each membership.
-      membership.alpha0="numeric",  #prior strength for the Dirichlet -- alpha0*vector(1)
+            #b.vector="numeric", b.vector.m="numeric", b.vector.v="numeric",
+            block.matrix="matrix",
+            block.matrix.m="matrix",
+            block.matrix.v="matrix",
 
-      shift="numeric",
-      restrict.and.shift="logical",
-      group.pairs="matrix",
+            symmetric.b="logical",
+            strong.block="logical",  ## 2014-12-08, ACT -- should the diagonal always be greater?
+
+
+            membership.edge="matrix",   #looks like edge list: has the membership number of each participant.
+            membership.node="matrix",   #each column is the Dirichlet distribution for each membership.
+            membership.alpha0="numeric",  #prior strength for the Dirichlet -- alpha0*vector(1)
+
+            shift="numeric",
+            restrict.and.shift="logical",
+            group.pairs="matrix",
+
 
       #single.membership="logical",
 
@@ -52,15 +59,21 @@ MMSBMcid <-
         residual.variance=1,
         outcome=numeric(0),
 
-        b.vector=rep(0, n.groups*(n.groups+1)/2),
-        b.vector.m=rep(0, n.groups*(n.groups+1)/2),
-        b.vector.v=rep(10000, n.groups*(n.groups+1)/2),
+#        b.vector=rep(0, n.groups*(n.groups+1)/2),
+#        b.vector.m=rep(0, n.groups*(n.groups+1)/2),
+#        b.vector.v=rep(10000, n.groups*(n.groups+1)/2),
+        block.matrix=matrix(0, nrow=n.groups, ncol=n.groups),
+        block.matrix.m=matrix(0, nrow=n.groups, ncol=n.groups),
+        block.matrix.v=matrix(10000, nrow=n.groups, ncol=n.groups),
+
 
         membership.alpha0=0.1,
         membership.node=rdirichlet.block (matrix(membership.alpha0, nrow=n.groups, ncol=n.nodes)),
         membership.edge=draw.MMSB.from.nodes(edge.list, membership.node),
 
+        strong.block=FALSE,
         shift=0,
+        symmetric.b=TRUE,
         #single.membership=FALSE,
 
         restrict.and.shift=FALSE,
@@ -75,9 +88,21 @@ MMSBMcid <-
 
         .self$n.groups <<- n.groups
 
-        .self$b.vector <<- b.vector
-        .self$b.vector.m <<- b.vector.m
-        .self$b.vector.v <<- b.vector.v
+#        .self$b.vector <<- b.vector
+#        .self$b.vector.m <<- b.vector.m
+#        .self$b.vector.v <<- b.vector.v
+        .self$block.matrix <<- block.matrix
+        .self$block.matrix.m <<- block.matrix.m
+        .self$block.matrix.v <<- block.matrix.v
+
+        if (symmetric.b) {
+            b.block <- .self$block.matrix
+            b.block[u.diag(.self$n.groups)] <- b.block[l.diag(.self$n.groups)]
+            .self$block.matrix <<- as.matrix(b.block)
+        }
+        .self$symmetric.b <<- symmetric.b
+
+
         .self$membership.edge <<- membership.edge
         .self$membership.node <<- membership.node
         .self$membership.alpha0 <<- membership.alpha0
@@ -85,6 +110,7 @@ MMSBMcid <-
         .self$residual.variance <<- residual.variance
         .self$restrict.and.shift <<- restrict.and.shift
         #.self$single.membership <<- FALSE
+        .self$strong.block <<- strong.block
 
         .self$group.pairs <<- makeEdgeListSelfies(n.groups)
 
@@ -93,10 +119,10 @@ MMSBMcid <-
         rotate()
       },
 
-      center.me = function () if (restrict.and.shift) {
-        shift <<- mean(b.vector)
-        b.vector <<- b.vector - shift
-      },
+#      center.me = function () if (restrict.and.shift) {
+#        shift <<- mean(b.vector)
+#        b.vector <<- b.vector - shift
+#      },
 
       reinitialize = function (n.nodes=NULL,
         edge.list=NULL, node.names=NULL) {
@@ -109,7 +135,8 @@ MMSBMcid <-
         if (n.groups > n.nodes) {
           warning ("MMSBM: Resetting number of groups to one less than the number of nodes.")
           n.groups <<- n.nodes - 1
-          b.vector <<- rep(0, n.groups*(n.groups+1)/2)
+          #b.vector <<- rep(0, n.groups*(n.groups+1)/2)
+          block.matrix <<- matrix(0, nrow=n.groups,ncol=n.groups)
 
           membership.node <<- sample(n.groups, n.nodes, replace=TRUE)
           membership.edge <<- draw.MMSB.from.nodes(edge.list, membership.node)
@@ -133,7 +160,7 @@ MMSBMcid <-
       },
 
       pieces = function (include.name=FALSE) {
-        out <- list (b.vector=b.vector,
+        out <- list (block.matrix=block.matrix,
                      membership.edge=membership.edge,
                      membership.node=membership.node)
         class(out) <- "MMSBMout"
@@ -142,12 +169,13 @@ MMSBMcid <-
       },
 
       show = function () {
-        message("b.vector:"); print(b.vector)
+        #message("b.vector:"); print(b.vector)
+        message("block.matrix:"); print(block.matrix)
         message("membership.edge:"); print(t(membership.edge))
         message("membership.node:"); print(membership.node)
         #message("mult.factor:"); print(mult.factor)
       },
-      plot = function (memb=membership.node, block=symBlock(b.vector), ...) {
+      plot = function (memb=membership.node, block=block.matrix, ...) {
         block.membership.plot (memb, block, node.labels=node.names, ...)
       },
       plot.network = function (color=outcome, ...) {
@@ -157,13 +185,14 @@ MMSBMcid <-
 
 
       value = function () {
-        sbm.matrix <- symBlock(b.vector)
+        #sbm.matrix <- symBlock(b.vector)
         #mult.factor*
-          sbm.matrix[membership.edge[,1] +
-                     dim(sbm.matrix)[1]*(membership.edge[,2]-1)]
+
+          block.matrix[membership.edge[,1] +
+                       dim(block.matrix)[1]*(membership.edge[,2]-1)]
       },
       value.ext = function (parameters=pieces(), edges=1:nrow(edge.list)) {   #slightly slower.
-        sbm.matrix <- symBlock(parameters[[1]])
+        sbm.matrix <- parameters[[1]]
         #parameters[[3]]*
         sbm.matrix[parameters[[2]][edges,1] +
                    dim(sbm.matrix)[1]*(parameters[[2]][edges,2]-1)]
@@ -183,10 +212,15 @@ MMSBMcid <-
 
         membership.node <<-
           rdirichlet.block (matrix(membership.alpha0, nrow=n.groups, ncol=n.nodes))
-
         membership.edge <<- draw.MMSB.from.nodes(edge.list, membership.node)
 
-        b.vector <<- rnorm(n.groups*(n.groups+1)/2, 0, 0.5)
+        block.matrix <<- matrix(rnorm(n.groups*n.groups, 0, 1), nrow=n.groups)
+        if (strong.block) {
+            pivots <- sapply(1:n.groups, function(kk) max (c(block.matrix[kk, -kk], block.matrix[-kk, kk])))
+            diag(block.matrix) <<- pivots + rexp(n.groups)
+        }
+
+##        b.vector <<- rnorm(n.groups*(n.groups+1)/2, 0, 0.5)
 #        rotate()
 
       },
@@ -196,7 +230,9 @@ MMSBMcid <-
         rotation <- MMSBM.ID.rotation(membership.node, n.groups)
         membership.edge <<- matrix(rotation[c(membership.edge)], ncol=2)
         membership.node <<- membership.node[rotation,]
-        b.vector <<- SBM.rotate.bvector(b.vector, rotation)
+        block.matrix <<- SBM.rotate.block(block.matrix, rotation)
+
+        ##b.vector <<- SBM.rotate.bvector(b.vector, rotation)
       },
 
       draw = function (verbose=0, as.if.single=FALSE) {
@@ -204,7 +240,7 @@ MMSBMcid <-
         if (length(outcome) != nrow(edge.list)) stop ("MMSBM: outcome and edge.list have different lengths.")
 
         #Hold me!
-        b.matrix <- symBlock(b.vector)
+        b.matrix <- block.matrix  ##symBlock(b.vector)
         b.block <- membership.edge
         b.node <- membership.node
         #if (verbose>1) print(b.memb)
@@ -256,21 +292,55 @@ MMSBMcid <-
         membership.edge <<- b.block
         membership.node <<- b.node
 
-        b.vector <<- sapply(1:length(b.vector), function(bb) {
-          picks <- unique(c(which(membership.edge[,1]==group.pairs[bb,1] &
-                                  membership.edge[,2]==group.pairs[bb,2]),
-                            which(membership.edge[,1]==group.pairs[bb,2] &
-                                  membership.edge[,2]==group.pairs[bb,1])))
-          if (length(picks) > 0) {
-            var.b <- 1/(length(picks)/residual.variance + 1/b.vector.v[bb])
-            mean.b <- var.b*(sum(outcome[picks])/residual.variance + b.vector.m[bb]/b.vector.v[bb])
-            output <- rnorm(1, mean.b, sqrt(var.b))
-          } else output <- rnorm(1, 0, 0.5)
-          output
-        })
 
 
-        if (restrict.and.shift) {center.me()}
+        for (ss in 1:n.groups)
+          for (rr in 1:n.groups) if (!symmetric.b | (symmetric.b & ss <= rr)) {
+            if (symmetric.b) {
+                picks <- unique(c(which(membership.edge[,1] == ss & membership.edge[,2] == rr),
+                                  which(membership.edge[,1] == rr & membership.edge[,2] == ss)))
+            } else {
+                picks <- unique(c(which(membership.edge[,1] == ss & membership.edge[,2] == rr)))
+            }
+
+ #                               picks <- which((b.memb[edge.list[,1]] == ss & b.memb[edge.list[,2]] == rr) |
+ #                                              (b.memb[edge.list[,2]] == ss & b.memb[edge.list[,1]] == rr))
+ #                           } else {
+ #                               picks <- which(b.memb[edge.list[,1]] == ss & b.memb[edge.list[,2]] == rr)
+ #                           }
+
+            if (length(picks) > 0) {
+              var.b <- 1/(length(picks)/residual.variance + 1/block.matrix.v[ss,rr])
+              mean.b <- var.b*(sum(outcome[picks])/residual.variance + block.matrix.m[ss,rr]/block.matrix.v[ss,rr])
+            } else {var.b <- 0.5^2; mean.b <- 0}
+
+            if (!strong.block) {
+                output <- rnorm(1, mean.b, sqrt(var.b))
+            } else {
+                if (ss == rr) {
+                    pivot <- max (c(block.matrix[ss, -ss], block.matrix[-ss, ss]))
+                    output <- rtnorm(1, mean.b, sqrt(var.b), lower=pivot)
+                } else {
+                    pivot <- min (c(block.matrix[ss, ss], block.matrix[rr, rr]))
+                    output <- rtnorm(1, mean.b, sqrt(var.b), upper=pivot)
+                }
+            }
+
+            block.matrix[ss,rr] <<- output
+            if (symmetric.b) block.matrix[rr,ss] <<- output
+          }
+
+
+        #b.vector <<- sapply(1:length(b.vector), function(bb) {
+        #  if (length(picks) > 0) {
+        #    var.b <- 1/(length(picks)/residual.variance + 1/b.vector.v[bb])
+        #    mean.b <- var.b*(sum(outcome[picks])/residual.variance + b.vector.m[bb]/b.vector.v[bb])
+        #    output <- rnorm(1, mean.b, sqrt(var.b))
+        #  } else output <- rnorm(1, 0, 0.5)
+        #  output
+        #})
+
+#        if (restrict.and.shift) {center.me()}
 #        rotate()
 
       },
@@ -298,14 +368,19 @@ MMSBMcid <-
         value.ext (gg)
       }),
 
+
+
       gibbs.summary = function (gibbs.out) {
         membs <- matrix(apply(sapply(gibbs.out, function(gg) gg$membership.node), 1, mean), ncol=n.nodes)
         colnames(membs) <- node.names
 
-        bvec <- apply(sapply(gibbs.out, function(gg) gg$b.vector), 1, mean)
+        this.block.matrix <- matrix(apply(sapply(gibbs.out, function(gg) c(gg$block.matrix)), 1, mean),
+                               nrow=n.groups)
+
+        #bvec <- apply(sapply(gibbs.out, function(gg) gg$b.vector), 1, mean)
         return(list(membership.node=membs,
-                    b.vector=bvec,
-                    block=symBlock(bvec)))
+                    #b.vector=bvec,
+                    block=this.block.matrix))
       },
       print.gibbs.summary = function (gibbs.sum) {
         message ("Block membership mixes:")
@@ -315,6 +390,27 @@ MMSBMcid <-
         print (gibbs.sum$block)
 
         return()
+      },
+
+
+      gibbs.mean = function(gibbs.out) {
+        get.sum <- gibbs.summary(gibbs.out)
+
+        return(MMSBM(n.groups=n.groups,
+                     n.nodes=n.nodes,
+                     edge.list=edge.list,
+                     edge.list.rows=edge.list.rows,
+                     residual.variance=residual.variance,
+                     outcome=outcome,
+                     block.matrix=get.sum$block,
+                     block.matrix.m=block.matrix.m,
+                     block.matrix.v=block.matrix.v,
+                     membership.alpha0=membership.alpha0,
+                     membership.node=get.sum$membership.node,
+                     strong.block=strong.block,
+                     shift=shift,
+                     symmetric.b=symmetric.b,
+                     restrict.and.shift=restrict.and.shift))
       },
 
       gibbs.plot = function (gibbs.out, ...) {

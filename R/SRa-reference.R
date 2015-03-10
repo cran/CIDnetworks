@@ -165,6 +165,21 @@ SRcid <-
         value.ext (gg)
       }),
 
+      gibbs.mean = function(gibbs.out){
+        get.sum <- gibbs.summary(gibbs.out)
+
+        return(SR(intercept.sr.Var=intercept.sr.Var,
+                 n.nodes=n.nodes,
+                  edge.list=edge.list,
+                  edge.list.rows=edge.list.rows,
+                  residual.variance=residual.variance,
+                  outcome=outcome,
+                  intercept.sr.Var.a=intercept.sr.Var.a,
+                  intercept.sr.Var.b=intercept.sr.Var.b,
+                  intercept.sr=matrix(get.sum[,"mean"],ncol=2)))
+
+      },
+
       gibbs.summary = function (gibbs.out) {
         coef.cov.mat <- sapply(gibbs.out, function(gg) c(gg$intercept.sr))
         ob1 <- cbind(mean=apply(coef.cov.mat, 1, mean),

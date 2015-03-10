@@ -15,9 +15,11 @@ importFrom(numDeriv, hessian)
 
 #exportPattern("^[[:alpha:]]+")
 export (CID, CID.Gibbs, CID.generate, CIDnetwork,
-        COV,HBM,LSM,LVM,MMSBM,SBM,SR,BETA,
-        
+        EdgeCOV, SenderCOV, ReceiverCOV, SendRecCOV, IdenticalCOV,
+	HBM,LSM,LVM,MMSBM,SBM,SR,BETA,
+
         unwrap.CID.Gibbs,
+        CID.metric,
 
         #list.output.to.matrices,
 
@@ -33,7 +35,7 @@ export (CID, CID.Gibbs, CID.generate, CIDnetwork,
 
         n.nodes,edge.list,is.net.directed,net.density,
         outcome,node.names,
-        inDegree,outDegree,socio,value.mat,
+        inDegree,outDegree,socio,value.mat,value.mat.mean,
         switcheroo,mat.cov.to.edge.list.cov, ##  add mans for these
 
         l.diag, u.diag, ordinal.maker)

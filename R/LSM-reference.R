@@ -11,7 +11,7 @@ LSMcid <-
 
       latent.space.pos="matrix",
       mult.factor="numeric",
-
+      latent.space.target = "matrix",
       #mult.factor.m="numeric",
       #mult.factor.v="numeric",
 
@@ -47,6 +47,7 @@ LSMcid <-
 
         ## Note: what is the default generated variance?
         latent.space.pos=matrix(rnorm(dimension*n.nodes), nrow=n.nodes),
+	latent.space.target=matrix(rep(0,dimension*n.nodes),nrow=n.nodes),
         #mult.factor.m=0,
         #mult.factor.v=10000,
 
@@ -155,6 +156,7 @@ LSMcid <-
 
       random.start = function () {
         latent.space.pos <<- matrix(rnorm(dimension*n.nodes, 0, sqrt(latent.space.pos.v)), nrow=n.nodes)
+	latent.space.target <<- latent.space.pos
       },
 
       draw = function (verbose=0, mh.tune=tune, langevin.mode=FALSE) {
@@ -185,7 +187,11 @@ LSMcid <-
         }
 
         ## Rotate back.
-        latent.space.pos.hold <- postprocess.latent.positions(latent.space.pos.hold)
+##        latent.space.pos.hold <- postprocess.latent.positions(latent.space.pos.hold)
+
+	##Procrustean transformation
+	##Using random start as a target matrix
+        latent.space.pos.hold <- postprocess.latent.positions(latent.space.pos.hold,latent.space.target)
         rownames(latent.space.pos.hold) <- node.names
 
         latent.space.pos <<- latent.space.pos.hold
@@ -238,6 +244,21 @@ LSMcid <-
         #return(invisible(get.sum))
       #},
 
+      gibbs.mean = function(gibbs.out){
+        get.sum <- gibbs.summary(gibbs.out)
+
+        return(LSM(dimension=dimension,n.nodes=n.nodes,
+                   edge.list=edge.list,
+                   edge.list.rows=edge.list.rows,
+                   residual.variance=residual.variance,
+                   outcome=outcome,
+                   latent.space.pos=get.sum,
+                   latent.space.pos.m=latent.space.pos.m,
+                   latent.space.pos.v=latent.space.pos.v,
+                   latent.space.pos.v.ab=latent.space.pos.v.ab,
+                   tune=tune,
+                   inverted.model=mult.factor==1))
+      },
 
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)

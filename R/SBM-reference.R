@@ -13,7 +13,6 @@ SBMcid <-
       n.groups="numeric",
 
       block.matrix="matrix",
-
       block.matrix.m="matrix",
       block.matrix.v="matrix",
 
@@ -21,14 +20,15 @@ SBMcid <-
       membership.a="matrix",
 
       symmetric.b="logical",
-      #same.sr.membership="logical",
+      strong.block="logical",  ## 2014-12-08, ACT -- should the diagonal always be greater?
+                                        #same.sr.membership="logical",
 
       ##shift="numeric",
       ##restrict.and.shift="logical",
 
       group.pairs="matrix",
 
-      #inherited from main. Must fix later, but OK for now.
+                                        #inherited from main. Must fix later, but OK for now.
       node.names="character",
       n.nodes="numeric",
       outcome="numeric",
@@ -58,12 +58,14 @@ SBMcid <-
 
         membership=sample(n.groups, n.nodes, replace=TRUE),
         symmetric.b=TRUE,
+        strong.block=FALSE,
 
         membership.a=matrix(1, nrow=n.nodes, ncol=n.groups),
 
         generate=FALSE
 
         ) {
+
 
         .self$n.nodes <<- n.nodes
         .self$edge.list <<- edge.list
@@ -83,6 +85,8 @@ SBMcid <-
         .self$group.pairs <<- makeEdgeListSelfies(n.groups)
 
         .self$symmetric.b <<- symmetric.b
+        .self$strong.block <<- strong.block
+
 
         if (symmetric.b) {
           b.block <- .self$block.matrix
@@ -136,8 +140,16 @@ SBMcid <-
         if (length(membership) != n.nodes) {
           message ("Reinitializing SBM Memberships")
           membership <<- sample(n.groups, n.nodes, replace=TRUE)
+        }
+        if(dim(membership.a) != c(n.nodes,n.groups)){
           membership.a <<- matrix(1, nrow=n.nodes, ncol=n.groups)
         }
+
+        while (length(unique(membership)) != n.groups) {
+            message ("reinitialize: Group membership omits classes.")
+            membership <<- sample(n.groups, n.nodes, replace=TRUE)
+        }
+
 
       },
 
@@ -186,7 +198,17 @@ SBMcid <-
 
       random.start = function () {
         membership <<- sample(n.groups, n.nodes, replace=TRUE)
+        while (length(unique(membership)) != n.groups) {
+            message ("reinitialize: Group membership omits classes.")
+            membership <<- sample(n.groups, n.nodes, replace=TRUE)
+        }
+
         block.matrix <<- matrix(rnorm(n.groups*n.groups, 0, 1), nrow=n.groups)
+        if (strong.block) {
+            pivots <- sapply(1:n.groups, function(kk) max (c(block.matrix[kk, -kk], block.matrix[-kk, kk])))
+            diag(block.matrix) <<- pivots + rexp(n.groups)
+        }
+
         #b.vector <<- rnorm(n.groups*(n.groups+1)/2, 0, 0.5)
         #if (restrict.and.shift) mult.factor <<- rnorm(1, mult.factor.m, sqrt(mult.factor.v))
       },
@@ -221,7 +243,8 @@ SBMcid <-
         if (verbose>1) print(b.memb)
 
         # draw memberships.
-        for (ii in sample(1:n.nodes)) {
+        ## Note 2014-12-05: If a move empties a class, disallow it. -AT
+        for (ii in sample(1:n.nodes)) if (any(b.memb[-ii] == b.memb[ii])) {
           log.pp.vec <- sapply(1:n.groups, function(gg) {
             b.memb[ii] <- gg
             piece <- block.matrix[b.memb[edge.list[edge.list.rows[[ii]],1]] +
@@ -253,8 +276,19 @@ SBMcid <-
             if (length(picks) > 0) {
               var.b <- 1/(length(picks)/residual.variance + 1/block.matrix.v[ss,rr])
               mean.b <- var.b*(sum(outcome[picks])/residual.variance + block.matrix.m[ss,rr]/block.matrix.v[ss,rr])
-              output <- rnorm(1, mean.b, sqrt(var.b))
-            } else output <- rnorm(1, 0, 0.5)
+            } else {var.b <- 0.5^2; mean.b <- 0}
+
+            if (!strong.block) {
+                output <- rnorm(1, mean.b, sqrt(var.b))
+            } else {
+                if (ss == rr) {
+                    pivot <- max (c(block.matrix[ss, -ss], block.matrix[-ss, ss]))
+                    output <- rtnorm(1, mean.b, sqrt(var.b), lower=pivot)
+                } else {
+                    pivot <- min (c(block.matrix[ss, ss], block.matrix[rr, rr]))
+                    output <- rtnorm(1, mean.b, sqrt(var.b), upper=pivot)
+                }
+            }
 
             block.matrix[ss,rr] <<- output
             if (symmetric.b) block.matrix[rr,ss] <<- output
@@ -281,6 +315,28 @@ SBMcid <-
       gibbs.value = function (gibbs.out) sapply(gibbs.out, function(gg) {
         value.ext (gg)
       }),
+
+      gibbs.mean = function(gibbs.out){
+        get.sum <- gibbs.summary(gibbs.out)
+
+        return(SBM(n.groups=n.groups,
+                   n.nodes=n.nodes,
+                   edge.list=edge.list,
+                   edge.list.rows=edge.list.rows,
+                   residual.variance=residual.variance,
+                   outcome=outcome,
+
+                   block.matrix=get.sum$block.matrix,
+                   block.matrix.m=block.matrix.m,
+                   block.matrix.v=block.matrix.v,
+
+                   membership=get.sum$modal.membership,
+                   symmetric.b=symmetric.b,
+                   strong.block=strong.block,
+
+                   membership.a=membership.a))
+
+      },
 
       gibbs.summary = function (gibbs.out) {
         membs1 <- {

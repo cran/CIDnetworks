@@ -3,15 +3,17 @@
 
 # Covariates component: Reference Class
 
-COVcid <-
+COVARIATEcid <-
   setRefClass(
-    "COVcid",
+    "COVARIATEcid",
     fields = list(
-      covariates="matrix",
+      covariates="array",
       coef.cov="numeric",
       coef.cov.m="numeric",
       coef.cov.V="matrix",
       coef.cov.P="matrix",
+
+      cov.type="character",
 
       cov.names="character",
 
@@ -22,16 +24,18 @@ COVcid <-
       outcome="numeric",
       edge.list="matrix",
       residual.variance="numeric",
-      edge.list.rows="list"    #,
+      edge.list.rows="list"    ,
+      center="logical"
+
       ),
 
     methods=list(
       initialize = function (
 
         covariates=array(1, c(nrow(edge.list),1)),
-        coef.cov=rep(0, ncol(covariates)),
+        coef.cov=c(), #rep(0, ncol(covariates)),
 
-        cov.names=as.character(colnames(covariates)),
+        cov.names=character(), #as.character(colnames(covariates)),
 
         n.nodes=10,
         edge.list=make.edge.list(n.nodes),
@@ -39,11 +43,14 @@ COVcid <-
         residual.variance=1,
         outcome=numeric(0),
 
-        coef.cov.m=rep(0, ncol(covariates)),
-        coef.cov.V=diag(1000000, rep(ncol(covariates), 2)),
+        coef.cov.m=0, #ncol(covariates)),
+        coef.cov.V=diag(1000000, 1), #rep(ncol(covariates), 2)),
+
+        cov.type="nothing",
+        center=TRUE,
+
 
         generate=FALSE
-
         ) {
 
         .self$n.nodes <<- n.nodes
@@ -51,24 +58,45 @@ COVcid <-
         .self$edge.list.rows <<- edge.list.rows
         .self$residual.variance <<- residual.variance
         .self$node.names <<- as.character(1:.self$n.nodes)
+        .self$center <<- center
 
-        .self$covariates <<- as.matrix(covariates)
-        .self$coef.cov <<- coef.cov
-        if (ncol(.self$covariates) != length(coef.cov)) stop ("Covariate matrix columns: ", ncol(.self$covariates), ", coefficient vector length ", length(coef.cov))
+        #handle covariates.
+        if (!(class(covariates) %in% c("array", "matrix"))) stop ("COV: Covariates must be a matrix or array object.")
 
-        if (length(cov.names) != ncol(.self$covariates)) {
-          warning ("Covariate matrix columns: ", ncol(.self$covariates), ", covariate names ", length(cov.names), ";replacing with defaults.")
-          .self$cov.names <- paste0 ("cov", 1:ncol(.self$covariates))
+        .self$covariates <<- as.array(covariates)
+        if (nrow(covariates) == ncol(covariates)) {
+          if (length(dim(covariates)) != 3) covariates <<- array (covariates, c(dim(covariates), 1))
+          temp.dim <- dim(covariates)[3]
+          temp.names <- dimnames(covariates)[[3]]
+          if (length(coef.cov) == temp.dim) .self$coef.cov <<- coef.cov else .self$coef.cov <<- rep(0, temp.dim)
         } else {
-          .self$cov.names <<- cov.names
+          temp.dim <- ncol(covariates)   #works for nodal or edge list covariates.
+          temp.names <- colnames(covariates)
+          if (length(coef.cov) == temp.dim) .self$coef.cov <<- coef.cov else .self$coef.cov <<- rep(0, temp.dim)
         }
 
-        .self$coef.cov.m <<- coef.cov.m
-        .self$coef.cov.V <<- as.matrix(coef.cov.V)
+        if(length(cov.names) == 0){
+          if(is.null(temp.names)){
+            .self$cov.names <- paste("COV",1:length(.self$coef.cov),sep=".")
+          }else{
+            .self$cov.names <- temp.names
+          }
+        }
 
-        .self$cov.block <<- t(covariates)%*%covariates
+#        if (length(cov.names) != length(.self$coef.cov)) {
+#          warning ("Covariate matrix columns: ", ncol(.self$covariates), ", covariate names ", length(cov.names), ";replacing with defaults.")
+#          .self$cov.names <- paste0 ("cov", 1:length(.self$coef.cov))
+#        } else {
+#          .self$cov.names <<- cov.names
+#        }
 
-        .self$coef.cov.P <<- solve(coef.cov.V)
+        if (length(coef.cov.m) != temp.dim) .self$coef.cov.m <<- rep(coef.cov.m, temp.dim)[1:temp.dim] else .self$coef.cov.m <<- coef.cov.m
+        if (nrow(coef.cov.V) != temp.dim) .self$coef.cov.V <<- diag(diag(coef.cov.V), temp.dim) else .self$coef.cov.V <<- as.matrix(coef.cov.V)
+
+        #.self$cov.block <<- t(covariates)%*%covariates
+
+        .self$coef.cov.P <<- solve(.self$coef.cov.V)
+        .self$cov.type <<- cov.type
 
         if (generate) .self$generate() else .self$outcome <<- outcome
 
@@ -81,17 +109,31 @@ COVcid <-
           edge.list.rows <<- row.list.maker(edge.list)
         }
 
-        if (!(class(covariates) %in% c("array", "matrix"))) stop ("COV: Covariates must be a matrix or array object.")
 
-        if (nrow(covariates) == n.nodes & ncol(covariates) == n.nodes) {
-          message("Detected a sociomatrix-style covariate array. Adjusting to match the edge list.")
-          elements.1 <- edge.list[,1] + (edge.list[,2]-1)*n.nodes
-          if (length(dim(covariates)) == 3)
-            elements.1 <- c(outer(elements.1, (1:dim(covariates)[3] - 1)*n.nodes^2, "+"))
-          covariates <<- matrix (covariates[elements.1], ncol=dim(covariates)[3])
+        if (cov.type == "Edge") {
+
+          if (nrow(covariates) == n.nodes & ncol(covariates) == n.nodes) {
+            message("Detected a sociomatrix-style covariate array. Adjusting to match the edge list.")
+            covariates <<- mat.cov.to.edge.list.cov (covariates, arc.list=edge.list)
+          }
+
         }
 
-        #Now, we can correct!
+        if (cov.type == "Sender")
+          covariates <<- covariates[edge.list[,1],,drop=FALSE]
+
+        if (cov.type == "Receiver")
+          covariates <<- covariates[edge.list[,2],,drop=FALSE]
+
+        if (cov.type == "SendRec")
+          covariates <<- covariates[edge.list[,1],,drop=FALSE] + covariates[edge.list[,2],,drop=FALSE]
+
+        if (cov.type == "Identical")
+          covariates <<- 1*(covariates[edge.list[,1],,drop=FALSE] == covariates[edge.list[,2],,drop=FALSE])
+
+
+        #Now, we can correct! Check dimensions of covariate matrix against edge list.
+
         if (nrow(covariates) < nrow(edge.list)) {
           stop (paste0("The number of rows in the COV matrix, ",nrow(covariates)," is less than the number of edges, ",nrow(edge.list),"."))
         }
@@ -101,6 +143,20 @@ COVcid <-
         if (!is.null(node.names)) {
           if (length(node.names) == .self$n.nodes) node.names <<- node.names
         } else node.names <<- as.character(1:.self$n.nodes)
+
+        ## .self$cov.block <<- t(covariates)%*%covariates
+        if(center){
+            covariates.new  <- t( t(covariates) - colMeans(covariates))
+            if(!identical(covariates.new, covariates)){
+                message("Centering covariates to speed sampler.  Do disable centering pass center = FALSE")
+                covariates <<- covariates.new
+            }
+
+        }
+        cov.block <<- t(covariates)%*%covariates  ##
+
+
+
       },
 
       pieces = function (include.name=FALSE) {
@@ -177,6 +233,23 @@ COVcid <-
         return()
       },
 
+      gibbs.mean = function(gibbs.out){
+        get.sum <- gibbs.summary(gibbs.out)
+
+        return(EdgeCOV(covariates=covariates,
+                       coef.cov=get.sum[,"estimated.mean"],
+                       cov.names=cov.names,
+                       n.nodes=n.nodes,
+                       edge.list=edge.list,
+                       edge.list.rows=edge.list.rows,
+                       residual.variance=residual.variance,
+                       outcome=outcome,
+                       coef.cov.m=coef.cov.m,
+                       coef.cov.V=coef.cov.V,
+                       cov.type=cov.type,
+                       center=center))
+      },
+
 
       gibbs.plot = function (gibbs.out, ...) {
         get.sum <- gibbs.summary(gibbs.out)
@@ -189,5 +262,34 @@ COVcid <-
 
       )
     )
+
+
+
+#SenderCOVcid <-
+#  setRefClass(
+#    "SenderCOVcid",
+#    contains=c("EdgeCOVcid"),
+
+#    methods=list(
+
+#      reinitialize = function (n.nodes=NULL, edge.list=NULL)
+#      {
+#        if (!is.null(n.nodes)) n.nodes <<- n.nodes
+#        if (!is.null(edge.list)) {
+#          edge.list <<- edge.list
+#          edge.list.rows <<- row.list.maker(edge.list)
+#        }
+
+        #reinitialize covariates to match.
+#        if (!(class(covariates) %in% c("array", "matrix"))) stop ("COV: Covariates must be a matrix or array object.")
+#        covariates <<- as.array(cbind(covariates))
+#        if (nrow(covariates) != n.nodes) stop ("SenderCOV: number of nodes is not the number of rows of covariates.")
+
+#        covariates <<- covariates[edge.list[,1],]
+#      }
+
+
+#      )
+#    )
 
 

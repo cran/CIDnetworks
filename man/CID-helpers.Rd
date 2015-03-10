@@ -4,7 +4,7 @@
 \alias{ordinal.maker}
 \alias{unwrap.CID.Gibbs}
 \alias{mat.cov.to.edge.list.cov}
-
+\alias{CID.metric}
 
 \title{Functions to aid in the use and construction of CIDnetworks objects}
 \description{
@@ -16,7 +16,8 @@
   ordinal.maker (vec, cuts=quantile(vec, c(0.25, 0.5, 0.75)))
 
   unwrap.CID.Gibbs (gibbs.out)
-  mat.cov.to.edge.list.cov (Xmat)
+  mat.cov.to.edge.list.cov (Xmat, n.nodes = dim(Xmat)[1],
+                            arc.list = make.arc.list(n.nodes))
 
 }
 \arguments{
@@ -30,8 +31,10 @@
 
   \item{gibbs.out}{The list object of draws from the Gibbs sampler. This
     re-sorts the object into a matrix form for easier consumption.}
-	\item{Xmat}{A three-dimensional array of covariates, with n.nodes rows
+  \item{Xmat}{A three-dimensional array of covariates, with n.nodes rows
     and columns. Each slice is a different covariate.}
+  \item{n.nodes}{Number of nodes in network}
+  \item{arc.list}{List of potential edges in network.}
   
 
 }
